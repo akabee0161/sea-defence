@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tower Defence</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="game-wrapper">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- HUD button bar — overlaid on top of canvas -->
+      <div id="top-bar">
+        <button id="btn-pause"      class="hud-btn">⏸</button>
+        <button id="btn-restart"    class="hud-btn restart-btn">↩</button>
+        <button id="btn-start-wave" class="hud-btn start-btn">▶</button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

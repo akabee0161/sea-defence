@@ -1,6 +1,6 @@
 import { GameObject } from './GameObject.ts';
 import { Renderer } from '../core/Renderer.ts';
-import { TILE_SIZE } from '../level/MapGrid.ts';
+import { TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
 
 export const CORAL_COST = 1;
 
@@ -9,7 +9,7 @@ export class CoralWall extends GameObject {
   readonly tileRow: number;
 
   constructor(col: number, row: number) {
-    super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2);
+    super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2 + GRID_OFFSET_Y);
     this.tileCol = col;
     this.tileRow = row;
   }

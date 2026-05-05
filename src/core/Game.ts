@@ -1,6 +1,6 @@
 import { Renderer } from './Renderer.ts';
 import { WaveManager } from './WaveManager.ts';
-import { MapGrid, PlacementSpot, START_ROWS, GOAL_ROWS, INITIAL_GOAL_IDX, TILE_SIZE } from '../level/MapGrid.ts';
+import { MapGrid, PlacementSpot, GOAL_ROWS, INITIAL_GOAL_IDX, TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
 import { CoralWall, CORAL_COST } from '../entities/CoralWall.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
 import { Enemy, EnemyKind } from '../entities/Enemy.ts';
@@ -81,14 +81,9 @@ export class Game {
     this.particlePool = new ObjectPool<Particle>(() => new Particle());
     this.waveManager  = new WaveManager(
       (kind: EnemyKind) => {
-        const startIdx = Math.floor(Math.random() * 3);
-        const startRow = START_ROWS[startIdx];
-        let nearestGoalIdx = -1, minDist = Infinity;
-        for (const gi of this.activeGoalIndices) {
-          const dist = Math.abs(startRow - GOAL_ROWS[gi]);
-          if (dist < minDist) { minDist = dist; nearestGoalIdx = gi; }
-        }
-        this.enemies.push(new Enemy(this.mapGrid.allRouteWaypoints[startIdx][nearestGoalIdx], kind));
+        const activeArr = [...this.activeGoalIndices];
+        const pathIdx   = activeArr[Math.floor(Math.random() * activeArr.length)];
+        this.enemies.push(new Enemy(this.mapGrid.paths[pathIdx], kind));
       },
       () => {
         // Remaining eggs → cracked eggs (building resource)
@@ -244,7 +239,7 @@ export class Game {
     let hpLost = 0;
     for (const enemy of this.enemies) {
       if (!enemy.isActive && enemy.hasReachedExit) {
-        const exitRow = Math.round((enemy.pos.y - TILE_SIZE / 2) / TILE_SIZE);
+        const exitRow = Math.round((enemy.pos.y - TILE_SIZE / 2 - GRID_OFFSET_Y) / TILE_SIZE);
         const gi      = GOAL_ROWS.indexOf(exitRow);
         if (gi >= 0 && this.goalEggs[gi] > 0) {
           this.goalEggs[gi]--;
@@ -273,7 +268,7 @@ export class Game {
 
   draw(): void {
     this.renderer.clear();
-    this.mapGrid.draw(this.renderer, this.activeGoalIndices);
+    this.mapGrid.draw(this.renderer);
     this.mapGrid.drawGoalMarkers(this.renderer, this.activeGoalIndices, this.goalEggs);
     this.drawSpots();
 
@@ -351,7 +346,6 @@ export class Game {
         if (this.activeGoalIndices.has(gi)) continue;
         if (col === 15 && row === GOAL_ROWS[gi]) {
           this.activeGoalIndices.add(gi);
-          this.mapGrid.activateGoalBranch(gi);
           this.goalEggs[gi] = EGGS_PER_GOAL;
           this.eggPlacingPhase = false;
           break;

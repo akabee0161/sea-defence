@@ -3,7 +3,7 @@ import { Enemy } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { ObjectPool } from '../utils/ObjectPool.ts';
 import { Renderer } from '../core/Renderer.ts';
-import { TILE_SIZE } from '../level/MapGrid.ts';
+import { TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
 
 export class Tower extends GameObject {
   readonly range: number;
@@ -24,7 +24,7 @@ export class Tower extends GameObject {
     damage      = 20,
     bulletSpeed = 250,
   ) {
-    super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2);
+    super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2 + GRID_OFFSET_Y);
     this.range       = range;
     this.fireRate    = fireRate;
     this.cost        = cost;

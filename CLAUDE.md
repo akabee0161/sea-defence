@@ -1,4 +1,4 @@
-# Tower Defence — CLAUDE.md
+# Sea Defence — CLAUDE.md
 
 ## 技術スタック
 

@@ -1,11 +1,11 @@
 import './style.css';
 import { Game } from './core/Game.ts';
-import { TILE_SIZE } from './level/MapGrid.ts';
+import { TILE_SIZE, GRID_OFFSET_Y } from './level/MapGrid.ts';
 
-const COLS = 16;
-const ROWS = 12;
-const CANVAS_W = COLS * TILE_SIZE; // 800
-const CANVAS_H = ROWS * TILE_SIZE; // 600
+const COLS = 8;
+const ROWS = 13;
+const CANVAS_W = COLS * TILE_SIZE;              // 400
+const CANVAS_H = ROWS * TILE_SIZE + GRID_OFFSET_Y; // 700
 
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
 if (!canvas) throw new Error('Canvas element #game-canvas not found');

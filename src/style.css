@@ -13,7 +13,7 @@ body {
   background: #071428;
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   overflow: hidden;
   font-family: monospace;
 }
@@ -23,13 +23,13 @@ body {
 #game-wrapper {
   position: relative;
   width: 100%;
-  max-width: 800px;
+  max-width: 400px;
 }
 
 #game-canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 800 / 600;
+  aspect-ratio: 400 / 700;
   image-rendering: pixelated;
   touch-action: none; /* prevent scroll/zoom interference on mobile */
 }

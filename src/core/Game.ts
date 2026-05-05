@@ -1,6 +1,6 @@
 import { Renderer } from './Renderer.ts';
 import { WaveManager } from './WaveManager.ts';
-import { MapGrid, PlacementSpot, GOAL_ROWS, INITIAL_GOAL_IDX, TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
+import { MapGrid, PlacementSpot, GOAL_COLS, GOAL_ROW, INITIAL_GOAL_IDX, TILE_SIZE } from '../level/MapGrid.ts';
 import { CoralWall, CORAL_COST } from '../entities/CoralWall.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
 import { Enemy, EnemyKind } from '../entities/Enemy.ts';
@@ -239,8 +239,8 @@ export class Game {
     let hpLost = 0;
     for (const enemy of this.enemies) {
       if (!enemy.isActive && enemy.hasReachedExit) {
-        const exitRow = Math.round((enemy.pos.y - TILE_SIZE / 2 - GRID_OFFSET_Y) / TILE_SIZE);
-        const gi      = GOAL_ROWS.indexOf(exitRow);
+        const exitCol = Math.round((enemy.pos.x - TILE_SIZE / 2) / TILE_SIZE);
+        const gi      = GOAL_COLS.indexOf(exitCol);
         if (gi >= 0 && this.goalEggs[gi] > 0) {
           this.goalEggs[gi]--;
           hpLost++;
@@ -342,9 +342,9 @@ export class Game {
 
     // ── Egg placing phase: tap an inactive goal slot to activate it ──────────
     if (this.eggPlacingPhase) {
-      for (let gi = 0; gi < GOAL_ROWS.length; gi++) {
+      for (let gi = 0; gi < GOAL_COLS.length; gi++) {
         if (this.activeGoalIndices.has(gi)) continue;
-        if (col === 15 && row === GOAL_ROWS[gi]) {
+        if (row === GOAL_ROW && col === GOAL_COLS[gi]) {
           this.activeGoalIndices.add(gi);
           this.goalEggs[gi] = EGGS_PER_GOAL;
           this.eggPlacingPhase = false;
@@ -388,9 +388,9 @@ export class Game {
     const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 280);
 
     // Highlight each inactive goal slot with a pulsing ring + faint egg
-    for (let gi = 0; gi < GOAL_ROWS.length; gi++) {
+    for (let gi = 0; gi < GOAL_COLS.length; gi++) {
       if (this.activeGoalIndices.has(gi)) continue;
-      const { x, y } = this.mapGrid.spotCenter(15, GOAL_ROWS[gi]);
+      const { x, y } = this.mapGrid.spotCenter(GOAL_COLS[gi], GOAL_ROW);
 
       // Pulsing ring
       ctx.save();
@@ -417,16 +417,17 @@ export class Game {
       ctx.restore();
     }
 
-    // Bottom hint banner
-    const r = this.renderer;
+    // Hint banner — just above the goal row
+    const r       = this.renderer;
+    const bannerY = r.height - 94; // sits above the bottom goal tiles
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.60)';
-    ctx.fillRect(0, r.height - 44, r.width, 44);
+    ctx.fillRect(0, bannerY, r.width, 44);
     ctx.fillStyle    = '#ffbb33';
-    ctx.font         = 'bold 15px monospace';
+    ctx.font         = 'bold 13px monospace';
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('次の卵の場所を選んでください', r.width / 2, r.height - 22);
+    ctx.fillText('次の卵の場所を選んでください', r.width / 2, bannerY + 22);
     ctx.restore();
   }
 

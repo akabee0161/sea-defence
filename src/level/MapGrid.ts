@@ -16,50 +16,55 @@ export interface PlacementSpot {
 /** Pixel offset from canvas top — reserves space for the HUD bar. */
 export const GRID_OFFSET_Y = 50;
 
-/** Row at col=15 for each goal slot (index = pathIdx / goalIdx). */
-export const GOAL_ROWS        = [1, 3, 5, 7, 9];
-/** Path that is active when the game begins (index into GOAL_ROWS / RAW_PATHS). */
+/**
+ * Column at col=GOAL_COLS[i], row=GOAL_ROW (bottom edge) for each goal slot.
+ * Index = pathIdx / goalIdx.
+ */
+export const GOAL_COLS        = [0, 7, 3, 5, 2];
+/** Bottom row index — where goal eggs sit. */
+export const GOAL_ROW         = 12;
+/** Path that is active when the game begins (index into GOAL_COLS / RAW_PATHS). */
 export const INITIAL_GOAL_IDX = 0;
 
 /**
  * 5 independent winding paths, each defined as [col, row] grid-coordinate
- * waypoints from the left edge (col=0) to the right edge (col=15).
- * Path i ends at (15, GOAL_ROWS[i]).
- * Row 0 = first visible row directly below the HUD.
+ * waypoints from the top edge (row=0) to the bottom edge (row=GOAL_ROW).
+ * Path i ends at (GOAL_COLS[i], GOAL_ROW).
+ * Enemies travel top → bottom.
  */
 const RAW_PATHS: [number, number][][] = [
-  // Path 0 → goal row 1  (zigzag rows 0–3, top area)
-  [[0,0],[3,0],[3,3],[7,3],[7,0],[11,0],[11,3],[14,3],[14,1],[15,1]],
-  // Path 1 → goal row 3  (zigzag rows 2–5, upper-middle)
-  [[0,2],[2,2],[2,5],[6,5],[6,2],[10,2],[10,5],[13,5],[13,3],[15,3]],
-  // Path 2 → goal row 5  (zigzag rows 5–8, lower-middle)
-  [[0,5],[3,5],[3,8],[7,8],[7,5],[11,5],[11,8],[14,8],[14,5],[15,5]],
-  // Path 3 → goal row 7  (zigzag rows 4–7, crosses paths 1 & 2)
-  [[0,7],[2,7],[2,4],[6,4],[6,7],[9,7],[9,4],[12,4],[12,7],[15,7]],
-  // Path 4 → goal row 9  (zigzag rows 6–9, bottom area)
-  [[0,9],[4,9],[4,6],[8,6],[8,9],[11,9],[11,6],[14,6],[14,9],[15,9]],
+  // Path 0 → goal col 0  (left zigzag)
+  [[0,0],[0,4],[4,4],[4,8],[0,8],[0,12]],
+  // Path 1 → goal col 7  (right zigzag)
+  [[7,0],[7,4],[3,4],[3,8],[7,8],[7,12]],
+  // Path 2 → goal col 3  (centre-left zigzag)
+  [[1,0],[1,4],[5,4],[5,8],[3,8],[3,12]],
+  // Path 3 → goal col 5  (centre zigzag, crosses paths 1 & 2)
+  [[5,0],[5,3],[1,3],[1,8],[5,8],[5,12]],
+  // Path 4 → goal col 2  (centre-right zigzag)
+  [[3,0],[3,4],[6,4],[6,8],[2,8],[2,12]],
 ];
 
 // Tower spots must be BUILDABLE (not on any path).
 // Coral spots must be PATH tiles (on a path).
 const PLACEMENT_SPOTS: PlacementSpot[] = [
   // ── Tower spots ───────────────────────────────────────────────────────────
-  { col:  1, row:  1, kind: 'tower' }, // top-left gap
-  { col:  5, row:  1, kind: 'tower' }, // top centre-left gap
-  { col:  9, row:  1, kind: 'tower' }, // top centre-right gap
-  { col: 13, row:  1, kind: 'tower' }, // top-right gap
-  { col:  1, row:  4, kind: 'tower' }, // mid-left, between paths 1 & 3
-  { col:  8, row:  4, kind: 'tower' }, // mid-centre, between paths 1 & 3
-  { col:  5, row:  7, kind: 'tower' }, // lower-mid-left, between paths 3 & 4
-  { col: 10, row:  7, kind: 'tower' }, // lower-mid-right
-  { col:  3, row: 10, kind: 'tower' }, // bottom-left
-  { col: 10, row: 10, kind: 'tower' }, // bottom-right
-  // ── Coral spots (on PATH tiles) ───────────────────────────────────────────
-  { col:  2, row:  0, kind: 'coral' }, // path 0, top row
-  { col:  1, row:  2, kind: 'coral' }, // path 1, left horizontal
-  { col:  1, row:  5, kind: 'coral' }, // path 2, left horizontal
-  { col:  4, row:  4, kind: 'coral' }, // path 3, upper horizontal
-  { col:  2, row:  9, kind: 'coral' }, // path 4, left horizontal
+  { col: 2, row:  2, kind: 'tower' }, // top area, left-centre gap
+  { col: 4, row:  2, kind: 'tower' }, // top area, centre gap
+  { col: 6, row:  1, kind: 'tower' }, // top area, right gap (upper)
+  { col: 6, row:  3, kind: 'tower' }, // top area, right gap (lower)
+  { col: 0, row:  6, kind: 'tower' }, // mid-left gap (between path rows 4 and 8)
+  { col: 2, row:  6, kind: 'tower' }, // mid-centre-left gap
+  { col: 7, row:  6, kind: 'tower' }, // mid-right gap
+  { col: 1, row: 10, kind: 'tower' }, // lower area, left gap
+  { col: 4, row: 10, kind: 'tower' }, // lower area, centre gap
+  { col: 6, row: 10, kind: 'tower' }, // lower area, right gap
+  // ── Coral spots (on PATH tiles, one per path) ─────────────────────────────
+  { col: 0, row:  2, kind: 'coral' }, // path 0 (col 0 vertical)
+  { col: 7, row:  2, kind: 'coral' }, // path 1 (col 7 vertical)
+  { col: 1, row:  2, kind: 'coral' }, // path 2 (col 1 vertical)
+  { col: 5, row:  2, kind: 'coral' }, // path 3 (col 5 vertical, rows 0-3)
+  { col: 3, row:  2, kind: 'coral' }, // path 4 (col 3 vertical)
 ];
 
 export enum TileType {
@@ -76,8 +81,8 @@ const TILE_COLORS: Record<TileType, string> = {
 
 export const TILE_SIZE = 50;
 
-const COLS = 16;
-const ROWS = 11;
+const COLS = 8;
+const ROWS = 13;
 
 function tileCenter(col: number, row: number): Vector2D {
   return new Vector2D(
@@ -124,7 +129,6 @@ export class MapGrid {
     return grid;
   }
 
-  /** Rebuild tiles to initial state — call on game restart. */
   reset(): void {
     this.tiles = this.buildInitialTiles();
   }
@@ -176,7 +180,7 @@ export class MapGrid {
   }
 
   /**
-   * Draw egg clusters at each active goal reflecting actual remaining egg count (0–3).
+   * Draw egg clusters at each active goal (bottom row, one per active path).
    * @param goalEggs array indexed by goalIdx; each value is 0–3
    */
   drawGoalMarkers(renderer: Renderer, activeGoalIndices: Set<number>, goalEggs: number[]): void {
@@ -190,10 +194,9 @@ export class MapGrid {
     ];
 
     for (const gi of activeGoalIndices) {
-      const { x, y } = tileCenter(15, GOAL_ROWS[gi]);
+      const { x, y } = tileCenter(GOAL_COLS[gi], GOAL_ROW);
       const count    = Math.max(0, Math.min(3, goalEggs[gi] ?? 0));
 
-      // Glow (always visible so player can see the goal even when empty)
       const glow = ctx.createRadialGradient(x, y, 2, x, y, 22);
       glow.addColorStop(0, count > 0 ? 'rgba(255, 200, 80, 0.35)' : 'rgba(150, 150, 150, 0.25)');
       glow.addColorStop(1, 'rgba(255, 200, 80, 0)');
@@ -202,7 +205,6 @@ export class MapGrid {
       ctx.fillStyle = glow;
       ctx.fill();
 
-      // Eggs — only draw as many as remain
       for (const [dx, dy] of OFFSETS.slice(0, count)) {
         const ex = x + dx;
         const ey = y + dy;

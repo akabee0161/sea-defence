@@ -91,6 +91,10 @@ function tileCenter(col: number, row: number): Vector2D {
   );
 }
 
+/** Derive the spawn cell (first tile) for each path. Order matches RAW_PATHS index. */
+const SPAWN_CELLS: ReadonlyArray<{ readonly col: number; readonly row: number }> =
+  RAW_PATHS.map(wp => ({ col: wp[0][0], row: wp[0][1] }));
+
 function markPath(grid: TileType[][], waypoints: [number, number][]): void {
   for (let i = 0; i < waypoints.length - 1; i++) {
     const [c0, r0] = waypoints[i];
@@ -143,6 +147,19 @@ export class MapGrid {
   }
 
   get allSpots(): readonly PlacementSpot[] { return PLACEMENT_SPOTS; }
+
+  /** Spawn cell (col, row) for each path, indexed by spawnIdx (= pathIdx). */
+  get spawnCells(): ReadonlyArray<{ readonly col: number; readonly row: number }> {
+    return SPAWN_CELLS;
+  }
+
+  /** True when the tile at (col, row) is a PATH tile (blue, walkable by enemies). */
+  isPathTile(col: number, row: number): boolean {
+    return this.getTile(col, row) === TileType.PATH;
+  }
+
+  /** Pixel-centre of the tile at (col, row), including GRID_OFFSET_Y. */
+  tileCenter(col: number, row: number): Vector2D { return tileCenter(col, row); }
 
   spotCenter(col: number, row: number): Vector2D { return tileCenter(col, row); }
 

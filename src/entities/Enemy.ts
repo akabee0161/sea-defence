@@ -4,6 +4,8 @@ import { Vector2D } from '../utils/Vector2D.ts';
 
 export type EnemyKind = 'small' | 'medium' | 'boss';
 
+export const EATING_INTERVAL = 2.0; // seconds between egg consumption at goal
+
 interface EnemyConfig {
   radius:    number;
   speed:     number;
@@ -27,34 +29,47 @@ export class Enemy extends GameObject {
   readonly radius: number;
   readonly reward: number;
 
-  private readonly waypoints:   Vector2D[];
+  private waypoints:            Vector2D[];
   private waypointIndex:        number;
   private hp:                   number;
   private readonly maxHp:       number;
   private readonly speed:       number;
   private readonly bodyColor:   string;
   private readonly finColor:    string;
-  private exitReached =         false;
+  isAtGoal =                    false; // true when shark has reached goal, eating eggs
+  eatingTimer =                 0;     // seconds until next egg consumed; managed by Game
+  currentGoalIdx:               number; // index into GOAL_COLS; managed by Game
   private facingAngle =         0; // radians; 0 = facing right (+x)
   private speedMultiplier =     1.0; // 1.0 = normal, < 1 = slowed by coral
 
-  constructor(waypoints: Vector2D[], kind: EnemyKind = 'small') {
+  constructor(waypoints: Vector2D[], kind: EnemyKind = 'small', goalIdx = 0) {
     super(waypoints[0].x, waypoints[0].y);
-    const cfg         = CONFIGS[kind];
-    this.kind         = kind;
-    this.waypoints    = waypoints;
-    this.waypointIndex = 1;
-    this.radius       = cfg.radius;
-    this.speed        = cfg.speed;
-    this.maxHp        = cfg.maxHp;
-    this.hp           = cfg.maxHp;
-    this.reward       = cfg.reward;
-    this.bodyColor    = cfg.bodyColor;
-    this.finColor     = cfg.finColor;
+    const cfg           = CONFIGS[kind];
+    this.kind           = kind;
+    this.waypoints      = waypoints;
+    this.waypointIndex  = 1;
+    this.radius         = cfg.radius;
+    this.speed          = cfg.speed;
+    this.maxHp          = cfg.maxHp;
+    this.hp             = cfg.maxHp;
+    this.reward         = cfg.reward;
+    this.bodyColor      = cfg.bodyColor;
+    this.finColor       = cfg.finColor;
+    this.currentGoalIdx = goalIdx;
+  }
+
+  /** Redirect this enemy to a new path toward a different goal. */
+  setNewPath(waypoints: Vector2D[], goalIdx: number): void {
+    this.waypoints      = waypoints;
+    this.waypointIndex  = 1;
+    this.isAtGoal       = false;
+    this.eatingTimer    = 0;
+    this.currentGoalIdx = goalIdx;
   }
 
   update(deltaTime: number): void {
-    if (!this.active || this.waypointIndex >= this.waypoints.length) return;
+    if (!this.active || this.isAtGoal) return;
+    if (this.waypointIndex >= this.waypoints.length) return;
 
     const target   = this.waypoints[this.waypointIndex];
     const toTarget = target.subtract(this.position);
@@ -70,8 +85,8 @@ export class Enemy extends GameObject {
       this.position = target.clone();
       this.waypointIndex++;
       if (this.waypointIndex >= this.waypoints.length) {
-        this.exitReached = true;
-        this.destroy();
+        this.isAtGoal = true;
+        this.eatingTimer = EATING_INTERVAL;
       }
     } else {
       this.position = this.position.add(toTarget.normalize().scale(step));
@@ -113,11 +128,17 @@ export class Enemy extends GameObject {
     ctx.stroke();
 
     // ── Open mouth (dark interior on top of body front) ──────────────────────
+    // When eating at goal: jaw oscillates gently; otherwise full dramatic open
+    const jawDrop = this.isAtGoal
+      ? r * (0.10 + 0.14 * Math.abs(Math.sin(Date.now() / 280)))
+      : r * 0.32;
+    const jawBack = this.isAtGoal ? jawDrop * 0.80 : r * 0.26;
+
     ctx.beginPath();
     ctx.moveTo(r * 0.82, -r * 0.05);  // upper-back
     ctx.lineTo(r * 1.28, -r * 0.08);  // upper lip tip (nose)
-    ctx.lineTo(r * 1.20,  r * 0.32);  // lower lip (jaw drops)
-    ctx.lineTo(r * 0.82,  r * 0.26);  // lower-back
+    ctx.lineTo(r * 1.20,  jawDrop);   // lower lip (jaw drops)
+    ctx.lineTo(r * 0.82,  jawBack);   // lower-back
     ctx.closePath();
     ctx.fillStyle = '#1a1a1a';
     ctx.fill();
@@ -138,11 +159,11 @@ export class Enemy extends GameObject {
       ctx.fill();
     }
 
-    // Lower fang × 1
+    // Lower fang × 1 — tracks jaw position
     ctx.beginPath();
-    ctx.moveTo(r * 1.02, r * 0.26);
-    ctx.lineTo(r * 1.10, r * 0.26 - th);
-    ctx.lineTo(r * 1.18, r * 0.26);
+    ctx.moveTo(r * 1.02, jawBack);
+    ctx.lineTo(r * 1.10, jawBack - th);
+    ctx.lineTo(r * 1.18, jawBack);
     ctx.closePath();
     ctx.fill();
 
@@ -208,6 +229,5 @@ export class Enemy extends GameObject {
     if (this.hp <= 0) this.destroy();
   }
 
-  get hasReachedExit(): boolean { return this.exitReached; }
-  get currentHp(): number       { return this.hp; }
+  get currentHp(): number { return this.hp; }
 }

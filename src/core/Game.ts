@@ -3,12 +3,13 @@ import { WaveManager } from './WaveManager.ts';
 import { MapGrid, PlacementSpot, GOAL_COLS, GOAL_ROW, INITIAL_GOAL_IDX, TILE_SIZE } from '../level/MapGrid.ts';
 import { CoralWall, CORAL_COST } from '../entities/CoralWall.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
-import { Enemy, EnemyKind } from '../entities/Enemy.ts';
+import { Enemy, EnemyKind, EATING_INTERVAL } from '../entities/Enemy.ts';
 import { Tower, createTower, towerCost } from '../entities/Tower.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { Particle } from '../entities/Particle.ts';
 import { Player } from '../entities/Player.ts';
 import { ObjectPool } from '../utils/ObjectPool.ts';
+import { findPath } from '../utils/Pathfinding.ts';
 
 const FIXED_TIMESTEP  = 1000 / 60;           // ms — 60 Hz logic tick
 const MAX_ACCUMULATED = FIXED_TIMESTEP * 5;  // spiral-of-death guard
@@ -78,8 +79,9 @@ export class Game {
   private holdSpot:  PlacementSpot | null = null;
   private holdTimer  = 0;
 
-  // Spot revealed by marlin proximity (nearest unoccupied spot within range)
-  private previewSpot: PlacementSpot | null = null;
+  // Spot / spawn revealed by marlin proximity — at most one active at a time
+  private previewSpot:  PlacementSpot | null = null;
+  private previewSpawn: number | null        = null; // spawnIdx, or null
 
   // Visual feedback
   private damageFlashTimer = 0; // counts down from DAMAGE_FLASH_DURATION after HP loss
@@ -98,10 +100,51 @@ export class Game {
     this.bulletPool   = new ObjectPool<Bullet>(() => new Bullet());
     this.particlePool = new ObjectPool<Particle>(() => new Particle());
     this.waveManager  = new WaveManager(
-      (kind: EnemyKind) => {
-        const activeArr = [...this.activeGoalIndices];
-        const pathIdx   = activeArr[Math.floor(Math.random() * activeArr.length)];
-        this.enemies.push(new Enemy(this.mapGrid.paths[pathIdx], kind));
+      (kind: EnemyKind, spawnIdx: number) => {
+        const spawnCell = this.mapGrid.spawnCells[spawnIdx];
+        if (!spawnCell) {
+          console.warn(`Unknown spawnIdx ${spawnIdx}`);
+          return;
+        }
+        // A*: find shortest path to each active goal with eggs remaining, pick nearest
+        let bestWaypoints: Vector2D[] | null = null;
+        let bestGoalIdx = -1;
+        let bestLen = Infinity;
+        for (const gi of this.activeGoalIndices) {
+          if (this.goalEggs[gi] <= 0) continue; // skip depleted goals
+          const goalCell = { col: GOAL_COLS[gi], row: GOAL_ROW };
+          const cells = findPath(
+            spawnCell,
+            goalCell,
+            (c, r) => this.mapGrid.isPathTile(c, r),
+          );
+          if (cells && cells.length < bestLen) {
+            bestLen = cells.length;
+            bestWaypoints = cells.map(cell => this.mapGrid.tileCenter(cell.col, cell.row));
+            bestGoalIdx = gi;
+          }
+        }
+        // Fallback: if all active goals are empty, pick any active goal
+        if (!bestWaypoints) {
+          for (const gi of this.activeGoalIndices) {
+            const goalCell = { col: GOAL_COLS[gi], row: GOAL_ROW };
+            const cells = findPath(
+              spawnCell,
+              goalCell,
+              (c, r) => this.mapGrid.isPathTile(c, r),
+            );
+            if (cells && cells.length < bestLen) {
+              bestLen = cells.length;
+              bestWaypoints = cells.map(cell => this.mapGrid.tileCenter(cell.col, cell.row));
+              bestGoalIdx = gi;
+            }
+          }
+        }
+        if (!bestWaypoints) {
+          console.warn(`No path from spawnIdx ${spawnIdx} to any active goal`);
+          return;
+        }
+        this.enemies.push(new Enemy(bestWaypoints, kind, bestGoalIdx));
       },
       () => {
         // Remaining eggs → cracked eggs (building resource)
@@ -161,6 +204,7 @@ export class Game {
     this.holdSpot         = null;
     this.holdTimer        = 0;
     this.previewSpot      = null;
+    this.previewSpawn     = null;
 
     this.enemies = [];
     this.towers  = [];
@@ -263,18 +307,42 @@ export class Game {
       if (particle.isActive) particle.update(deltaTime);
     }
 
-    // 7. Penalise player for enemies that reached a goal (eat one egg there)
+    // 7. Enemies at goal eat eggs on a 2-second interval; redirect when goal is depleted
     let hpLost = 0;
+    const toRedirect = new Set<Enemy>();
+
     for (const enemy of this.enemies) {
-      if (!enemy.isActive && enemy.hasReachedExit) {
-        const exitCol = Math.round((enemy.pos.x - TILE_SIZE / 2) / TILE_SIZE);
-        const gi      = GOAL_COLS.indexOf(exitCol);
-        if (gi >= 0 && this.goalEggs[gi] > 0) {
+      if (!enemy.isActive) continue;
+
+      if (enemy.isAtGoal) {
+        const gi = enemy.currentGoalIdx;
+        // Arrived at a goal that is already empty — redirect immediately
+        if (gi < 0 || this.goalEggs[gi] <= 0) {
+          toRedirect.add(enemy);
+          continue;
+        }
+        enemy.eatingTimer -= deltaTime;
+        if (enemy.eatingTimer <= 0) {
           this.goalEggs[gi]--;
           hpLost++;
+          enemy.eatingTimer += EATING_INTERVAL; // += avoids timer drift
+          if (this.goalEggs[gi] === 0) {
+            toRedirect.add(enemy);
+          }
+        }
+      } else {
+        // Still en route — redirect if target goal was depleted by another enemy
+        const gi = enemy.currentGoalIdx;
+        if (gi >= 0 && this.goalEggs[gi] <= 0) {
+          toRedirect.add(enemy);
         }
       }
     }
+
+    for (const enemy of toRedirect) {
+      this.redirectEnemyToNextGoal(enemy);
+    }
+
     if (hpLost > 0) {
       this.damageFlashTimer = DAMAGE_FLASH_DURATION;
     }
@@ -294,27 +362,55 @@ export class Game {
     // 9. Player marlin — purely cosmetic, follows pointer drag
     this.player.update(deltaTime);
 
-    // 10. Refresh nearest-spot preview based on the marlin's position
-    this.updatePreviewSpot();
+    // 10. Refresh proximity preview (build spot or spawn warning)
+    this.updatePreview();
   }
 
-  private updatePreviewSpot(): void {
-    if (this.eggPlacingPhase || this.crackedEggs < 1) {
-      this.previewSpot = null;
-      return;
-    }
-    let best: PlacementSpot | null = null;
-    let bestDist = PLAYER_PREVIEW_RADIUS;
-    for (const spot of this.mapGrid.allSpots) {
-      if (this.occupiedSpots.has(`${spot.col},${spot.row}`)) continue;
-      const center = this.mapGrid.spotCenter(spot.col, spot.row);
-      const d = this.player.pos.distanceTo(center);
-      if (d < bestDist) {
-        best = spot;
-        bestDist = d;
+  /**
+   * Determine what the marlin is close enough to reveal:
+   * either a build spot (previewSpot) or a spawn warning (previewSpawn).
+   * When both are within range, the closer one wins (spec §D-2).
+   */
+  private updatePreview(): void {
+    // ── Build spot candidate ──────────────────────────────────────────────────
+    let bestSpot: PlacementSpot | null = null;
+    let bestSpotDist = Infinity;
+    if (!this.eggPlacingPhase && this.crackedEggs >= 1) {
+      for (const spot of this.mapGrid.allSpots) {
+        if (this.occupiedSpots.has(`${spot.col},${spot.row}`)) continue;
+        const center = this.mapGrid.spotCenter(spot.col, spot.row);
+        const d = this.player.pos.distanceTo(center);
+        if (d < bestSpotDist) { bestSpot = spot; bestSpotDist = d; }
       }
     }
-    this.previewSpot = best;
+
+    // ── Spawn marker candidate ────────────────────────────────────────────────
+    let bestSpawn: number | null = null;
+    let bestSpawnDist = Infinity;
+    const spawnVisible =
+      this.waveManager.isInterWave &&
+      !this.eggPlacingPhase &&
+      !this.gameOver &&
+      !this.waveManager.isGameClear &&
+      this.waveManager.nextWaveEnemies.length > 0;
+    if (spawnVisible) {
+      const cells = this.mapGrid.spawnCells;
+      for (let i = 0; i < cells.length; i++) {
+        if (this.waveManager.nextWaveEnemiesBySpawn(i).length === 0) continue;
+        const center = this.mapGrid.tileCenter(cells[i].col, cells[i].row);
+        const d = this.player.pos.distanceTo(center);
+        if (d < bestSpawnDist) { bestSpawn = i; bestSpawnDist = d; }
+      }
+    }
+
+    // ── Resolve: nearer wins; must be within radius ───────────────────────────
+    if (bestSpotDist <= bestSpawnDist) {
+      this.previewSpot  = bestSpotDist  < PLAYER_PREVIEW_RADIUS ? bestSpot  : null;
+      this.previewSpawn = null;
+    } else {
+      this.previewSpot  = null;
+      this.previewSpawn = bestSpawnDist < PLAYER_PREVIEW_RADIUS ? bestSpawn : null;
+    }
   }
 
   // ─── Draw ──────────────────────────────────────────────────────────────────
@@ -349,9 +445,13 @@ export class Game {
       this.drawEggPlacingOverlay();
     }
 
+    // Spawn warning markers on active spawn cells (inter-wave only)
+    this.drawSpawnMarkers();
+
     // Marlin-proximity preview — shown when no hold is in progress
     if (this.holdSpot === null) {
       this.drawProximityPreview();
+      this.drawSpawnProximityPreview();
     }
 
     // Long-press preview — drawn above game objects, below HUD
@@ -382,6 +482,37 @@ export class Game {
   private spawnParticles(x: number, y: number, color: string, count: number): void {
     for (let i = 0; i < count; i++) {
       this.particlePool.acquire().init(x, y, color);
+    }
+  }
+
+  /**
+   * Find the nearest active goal that still has eggs and redirect the enemy to it.
+   * Uses A* from the enemy's current grid position; skips the enemy's current goal.
+   */
+  private redirectEnemyToNextGoal(enemy: Enemy): void {
+    const startCell = this.mapGrid.pixelToGrid(enemy.pos);
+    let bestWaypoints: Vector2D[] | null = null;
+    let bestGoalIdx = -1;
+    let bestLen = Infinity;
+
+    for (const gi of this.activeGoalIndices) {
+      if (gi === enemy.currentGoalIdx) continue; // skip the depleted goal
+      if (this.goalEggs[gi] <= 0) continue;      // skip other empty goals
+      const goalCell = { col: GOAL_COLS[gi], row: GOAL_ROW };
+      const cells = findPath(
+        startCell,
+        goalCell,
+        (c, r) => this.mapGrid.isPathTile(c, r),
+      );
+      if (cells && cells.length < bestLen) {
+        bestLen = cells.length;
+        bestWaypoints = cells.map(cell => this.mapGrid.tileCenter(cell.col, cell.row));
+        bestGoalIdx = gi;
+      }
+    }
+
+    if (bestWaypoints && bestGoalIdx >= 0) {
+      enemy.setNewPath(bestWaypoints, bestGoalIdx);
     }
   }
 
@@ -723,37 +854,6 @@ export class Game {
       new Vector2D(133, 30), '#7ec8e3', 'bold 15px monospace',
     );
 
-    // ── Next-wave enemy preview (inline, always visible when data exists) ────
-    const nextEnemies = this.waveManager.nextWaveEnemies;
-    if (nextEnemies.length > 0) {
-      // Vertical separator
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-      ctx.lineWidth   = 1;
-      ctx.beginPath();
-      ctx.moveTo(162, 9);
-      ctx.lineTo(162, 41);
-      ctx.stroke();
-      ctx.restore();
-
-      // Enemy icons + ×count, left-to-right
-      let ex = 168;
-      for (const { kind, count } of nextEnemies) {
-        const SR = 6;
-        this.drawMiniShark(ctx, ex + SR, CY, kind, SR);
-        ex += SR * 2 + 4;
-
-        ctx.save();
-        ctx.fillStyle    = '#eeeeee';
-        ctx.font         = 'bold 12px monospace';
-        ctx.textAlign    = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`×${count}`, ex, CY);
-        ctx.restore();
-
-        ex += (count >= 10 ? 28 : 20) + 8;
-      }
-    }
   }
 
   private drawHudCrackedEggIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
@@ -847,6 +947,118 @@ export class Game {
     r.context.fillText('Tap ↩ Restart to play again', cx, cy + 106);
 
     r.context.textAlign = 'left';
+  }
+
+  // ─── Spawn markers & proximity preview ────────────────────────────────────
+
+  /** Red warning triangles on every spawn cell that has enemies in the next wave. */
+  private drawSpawnMarkers(): void {
+    if (!this.waveManager.isInterWave) return;
+    if (this.eggPlacingPhase || this.gameOver || this.waveManager.isGameClear) return;
+    if (this.waveManager.nextWaveEnemies.length === 0) return;
+
+    const ctx    = this.renderer.context;
+    const cells  = this.mapGrid.spawnCells;
+    const pulse  = 0.55 + 0.45 * Math.sin(Date.now() / 320);
+
+    for (let i = 0; i < cells.length; i++) {
+      if (this.waveManager.nextWaveEnemiesBySpawn(i).length === 0) continue;
+      const { x, y } = this.mapGrid.tileCenter(cells[i].col, cells[i].row);
+      const r = 13;
+
+      ctx.save();
+      ctx.globalAlpha = 0.55 + 0.35 * pulse;
+
+      // Triangle (apex up)
+      ctx.beginPath();
+      ctx.moveTo(x,            y - r);
+      ctx.lineTo(x + r * 0.87, y + r * 0.5);
+      ctx.lineTo(x - r * 0.87, y + r * 0.5);
+      ctx.closePath();
+      ctx.fillStyle   = '#e74c3c';
+      ctx.fill();
+      ctx.strokeStyle = '#922b21';
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // "!" label
+      ctx.globalAlpha    = 1;
+      ctx.fillStyle      = '#ffffff';
+      ctx.font           = `bold ${r}px monospace`;
+      ctx.textAlign      = 'center';
+      ctx.textBaseline   = 'middle';
+      ctx.fillText('!', x, y + r * 0.1);
+
+      ctx.restore();
+    }
+  }
+
+  /** Pill popup below a spawn cell when the marlin is close enough. */
+  private drawSpawnProximityPreview(): void {
+    if (this.previewSpawn === null) return;
+    const cells   = this.mapGrid.spawnCells;
+    const cell    = cells[this.previewSpawn];
+    if (!cell) return;
+    const enemies = this.waveManager.nextWaveEnemiesBySpawn(this.previewSpawn);
+    if (enemies.length === 0) return;
+
+    const ctx    = this.renderer.context;
+    const center = this.mapGrid.tileCenter(cell.col, cell.row);
+
+    const ROW_H  = 22;
+    const PAD_X  = 12;
+    const PAD_Y  = 8;
+    const SHARK_R = 7;
+    const TEXT_GAP = 4;
+    const countWidth = (count: number) => (count >= 10 ? 22 : 16);
+
+    // Measure pill width from widest row
+    const rowWidth = () => SHARK_R * 2 + TEXT_GAP + 18; // fixed min
+    const pillW  = Math.max(...enemies.map(() => rowWidth())) + PAD_X * 2 + 8;
+    const pillH  = enemies.length * ROW_H + PAD_Y * 2;
+    const pillX  = center.x - pillW / 2;
+    const pillY  = center.y + TILE_SIZE * 0.5 + 4; // below spawn cell
+    const pillR  = 8;
+
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+
+    // Rounded rectangle background
+    ctx.beginPath();
+    ctx.moveTo(pillX + pillR, pillY);
+    ctx.lineTo(pillX + pillW - pillR, pillY);
+    ctx.quadraticCurveTo(pillX + pillW, pillY,          pillX + pillW, pillY + pillR);
+    ctx.lineTo(pillX + pillW, pillY + pillH - pillR);
+    ctx.quadraticCurveTo(pillX + pillW, pillY + pillH,  pillX + pillW - pillR, pillY + pillH);
+    ctx.lineTo(pillX + pillR, pillY + pillH);
+    ctx.quadraticCurveTo(pillX, pillY + pillH,          pillX, pillY + pillH - pillR);
+    ctx.lineTo(pillX, pillY + pillR);
+    ctx.quadraticCurveTo(pillX, pillY,                  pillX + pillR, pillY);
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(10, 20, 50, 0.82)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(231, 76, 60, 0.60)';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+
+    // Draw each enemy row
+    for (let idx = 0; idx < enemies.length; idx++) {
+      const { kind, count } = enemies[idx];
+      const rowY = pillY + PAD_Y + idx * ROW_H + ROW_H / 2;
+      const sharkX = pillX + PAD_X + SHARK_R;
+      ctx.globalAlpha = 1;
+      this.drawMiniShark(ctx, sharkX, rowY, kind, SHARK_R);
+
+      const tw = countWidth(count);
+      const textX = sharkX + SHARK_R + TEXT_GAP + tw / 2 + 4;
+      ctx.fillStyle      = '#eeeeee';
+      ctx.font           = 'bold 13px monospace';
+      ctx.textAlign      = 'center';
+      ctx.textBaseline   = 'middle';
+      ctx.fillText(`×${count}`, textX, rowY);
+    }
+
+    ctx.restore();
   }
 
   private drawGameOver(): void {

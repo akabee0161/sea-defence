@@ -9,30 +9,6 @@
 | 描画 | HTML5 Canvas API (800×600px) |
 | 外部ゲームライブラリ | なし（フルスクラッチ） |
 
-## プロジェクト構造
-
-```
-src/
-├── main.ts               # エントリポイント・UI ボタン配線
-├── style.css             # レスポンシブレイアウト（モバイル対応）
-├── core/
-│   ├── Game.ts           # ゲームループ・状態管理・フェーズ制御
-│   ├── Renderer.ts       # Canvas 描画の抽象化レイヤー
-│   └── WaveManager.ts    # Wave 構成・スポーン管理
-├── entities/
-│   ├── GameObject.ts     # 全エンティティの抽象基底クラス
-│   ├── Enemy.ts          # サメ敵（small / medium / boss）
-│   ├── Tower.ts          # タコタワー（索敵・射撃）
-│   ├── CoralWall.ts      # 珊瑚壁（サメ減速）
-│   ├── Bullet.ts         # 墨弾（ホーミング）
-│   └── Particle.ts       # 墨パーティクル（エフェクト）
-├── level/
-│   └── MapGrid.ts        # グリッド・5経路定義・配置スポット
-└── utils/
-    ├── Vector2D.ts       # 2D ベクトル演算（イミュータブル）
-    └── ObjectPool.ts     # ジェネリックオブジェクトプール
-```
-
 ## ゲーム概要
 
 幼児向け海テーマのタワーディフェンス。敵＝サメ、タワー＝タコ、壁＝珊瑚、守るもの＝卵。
@@ -58,3 +34,5 @@ npm run preview  # 本番ビルドのプレビュー
 - 新エンティティは `ObjectPool` を使い GC 負荷を抑える。
 - `TileType` は `enum`（`const enum` 不可、isolatedModules: true のため）。
 - ピクセル座標はタイル座標に `GRID_OFFSET_Y` を加算すること（Tower・CoralWall 参照）。
+- `noUnusedLocals` / `noUnusedParameters` が有効。未使用の変数・引数はビルドエラーになる。
+- **デプロイパス**：Vite `base` は `/labs/games/sea-defence/` 固定。静的アセット参照時に注意。

@@ -7,16 +7,20 @@ const BODY_HALF   = 28;   // half-length of body (excluding bill)
 const FOLLOW_LERP = 12;   // higher = snappier follow
 const ANGLE_LERP  = 10;   // smoothing for facing-angle changes
 
+const COOLDOWN_GAUGE_R  = 12; // px — radius of attack cooldown ring
+const COOLDOWN_GAUGE_OY = 50; // px above player center
+
 const COLOR_DARK = '#0d2842';
 const COLOR_BACK = '#1f4d78';
 const COLOR_MID  = '#5594c5';
 const COLOR_BELLY = '#dfeaf3';
 
 export class Player extends GameObject {
-  private target:      Vector2D;
+  private target:       Vector2D;
   private facingAngle = 0;     // radians
   private animTime    = 0;
   private speedNorm   = 0;     // 0..1 — drives fin amplitude
+  private _isAttacking = false;
   readonly hitRadius  = HIT_RADIUS;
 
   constructor(x: number, y: number) {
@@ -26,6 +30,19 @@ export class Player extends GameObject {
 
   setTarget(x: number, y: number): void {
     this.target = new Vector2D(x, y);
+  }
+
+  setPosition(x: number, y: number): void {
+    this.position = new Vector2D(x, y);
+    this.target   = new Vector2D(x, y);
+  }
+
+  setFacing(angle: number): void {
+    this.facingAngle = angle;
+  }
+
+  setAttacking(v: boolean): void {
+    this._isAttacking = v;
   }
 
   resetTo(x: number, y: number): void {
@@ -43,6 +60,12 @@ export class Player extends GameObject {
   }
 
   update(deltaTime: number): void {
+    if (this._isAttacking) {
+      this.speedNorm = Math.min(1, this.speedNorm + deltaTime * 6);
+      this.animTime += deltaTime * (4 + this.speedNorm * 10);
+      return;
+    }
+
     const prevX = this.position.x;
     const prevY = this.position.y;
 
@@ -69,6 +92,21 @@ export class Player extends GameObject {
     this.speedNorm += (speedTarget - this.speedNorm) * Math.min(1, deltaTime * 6);
 
     this.animTime += deltaTime * (4 + this.speedNorm * 10);
+  }
+
+  drawCooldown(renderer: Renderer, progress: number): void {
+    const ctx = renderer.context;
+    const cx  = this.position.x;
+    const cy  = this.position.y - COOLDOWN_GAUGE_OY;
+    const startAngle = -Math.PI / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, COOLDOWN_GAUGE_R, startAngle, startAngle + Math.PI * 2 * progress);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth   = 2;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+    ctx.restore();
   }
 
   draw(renderer: Renderer): void {

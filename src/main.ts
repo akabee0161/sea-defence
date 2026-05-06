@@ -32,7 +32,15 @@ btnRestart?.addEventListener('click',   () => { game.restart(); });
 
 function syncUI(): void {
   if (btnStartWave) {
-    btnStartWave.disabled = !game.isInterWave || game.isPaused || game.isGameClear || game.isEggPlacing;
+    if (game.isWaveClear) {
+      btnStartWave.textContent = 'NEXT WAVE';
+      btnStartWave.disabled    = false;
+      btnStartWave.classList.add('next-wave');
+    } else {
+      btnStartWave.textContent = '▶';
+      btnStartWave.disabled    = !game.isInterWave || game.isPaused || game.isGameClear || game.isEggPlacing;
+      btnStartWave.classList.remove('next-wave');
+    }
   }
 
   if (btnPause) {

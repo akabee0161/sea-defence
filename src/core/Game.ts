@@ -1,10 +1,10 @@
 import { Renderer } from './Renderer.ts';
 import { WaveManager } from './WaveManager.ts';
 import { MapGrid, PlacementSpot, GOAL_COLS, GOAL_ROW, INITIAL_GOAL_IDX, TILE_SIZE } from '../level/MapGrid.ts';
-import { CoralWall, CORAL_COST } from '../entities/CoralWall.ts';
+import { CoralWall } from '../entities/CoralWall.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
 import { Enemy, EnemyKind, EATING_INTERVAL } from '../entities/Enemy.ts';
-import { Tower, createTower, towerCost } from '../entities/Tower.ts';
+import { Tower, createTower } from '../entities/Tower.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { Particle } from '../entities/Particle.ts';
 import { Player } from '../entities/Player.ts';
@@ -19,6 +19,10 @@ const INITIAL_CRACKED_EGGS = 3; // building resource at game start
 
 const DAMAGE_FLASH_DURATION = 0.4; // seconds — red screen flash on HP loss
 const HOLD_DURATION         = 2.0; // seconds to hold pointer before placing
+const ATTACK_COOLDOWN       = 2.0; // seconds between player dash attacks
+const ATTACK_DAMAGE         = 50;  // damage dealt per dash
+const ATTACK_SPEED          = 600; // px/s during dash
+const ATTACK_HIT_DIST       = 8;   // px beyond radii sum to register a hit
 const CORAL_SLOW_RADIUS     = 30;  // px — enemies within this range are slowed
 const PLAYER_PREVIEW_RADIUS = 75;  // px — marlin reveals nearest spot within this range
 const PREVIEW_ALPHA         = 0.40;
@@ -50,11 +54,16 @@ export class Game {
   private readonly bulletPool:   ObjectPool<Bullet>;
   private readonly particlePool: ObjectPool<Particle>;
 
-  // Player marlin — purely cosmetic for now (no gameplay effect)
+  // Player marlin
   private readonly player: Player;
   private readonly playerHome: Vector2D;
   private playerDragPointerId: number | null = null;
   private playerDragStart: Vector2D | null = null;
+
+  // Dash attack state
+  private attackTarget:     Enemy | null = null;
+  private attackCooldown    = 0;
+  private isPlayerAttacking = false;
 
   // Player state
   // goalEggs[gi] = remaining eggs at goal slot gi (0–EGGS_PER_GOAL)
@@ -68,8 +77,9 @@ export class Game {
     for (const gi of this.activeGoalIndices) total += this.goalEggs[gi];
     return total;
   }
-  private eggPlacingPhase = false; // true after wave clear, until player places egg
-  private gameOver        = false;
+  private eggPlacingPhase  = false; // true after wave clear overlay dismissed, until player places egg
+  private waveClearPhase   = false; // true after wave clear, until player taps NEXT WAVE
+  private gameOver         = false;
 
 
   // Lifecycle controls
@@ -85,6 +95,12 @@ export class Game {
 
   // Visual feedback
   private damageFlashTimer = 0; // counts down from DAMAGE_FLASH_DURATION after HP loss
+
+  // Score tracking
+  private totalScore = 0;
+  private currentWaveEnemiesDefeated = 0;
+  private currentWaveStartTime = 0;
+  private lastWaveScoreDetails: { enemyScore: number; eggScore: number; timeBonus: number; total: number; crackedEggsEarned: number } | null = null;
 
   // Loop internals
   private lastTimestamp = 0;
@@ -146,15 +162,25 @@ export class Game {
         }
         this.enemies.push(new Enemy(bestWaypoints, kind, bestGoalIdx));
       },
-      () => {
+      (waveNumber: number) => {
+        // Calculate wave scores BEFORE refilling eggs
+        const enemyScore      = this.currentWaveEnemiesDefeated * 100;
+        const eggScore        = this.playerHp * 50;
+        const elapsedMs       = performance.now() - this.currentWaveStartTime;
+        const timeBonus       = this.calculateTimeBonus(waveNumber, elapsedMs);
+        const waveTotal       = enemyScore + eggScore + timeBonus;
+        const crackedEggsEarned = this.playerHp; // captured before refill
+        this.lastWaveScoreDetails = { enemyScore, eggScore, timeBonus, total: waveTotal, crackedEggsEarned };
+        this.totalScore += waveTotal;
+
         // Remaining eggs → cracked eggs (building resource)
-        this.crackedEggs += this.playerHp;
+        this.crackedEggs += crackedEggsEarned;
         // Refill all active goals to EGGS_PER_GOAL for the next wave
         for (const gi of this.activeGoalIndices) {
           this.goalEggs[gi] = EGGS_PER_GOAL;
         }
         if (!this.waveManager.isGameClear) {
-          this.eggPlacingPhase = true; // player must place next egg before building
+          this.waveClearPhase = true; // show wave clear overlay; player taps NEXT WAVE to proceed
         }
       },
     );
@@ -197,6 +223,7 @@ export class Game {
     this.activeGoalIndices = new Set([INITIAL_GOAL_IDX]);
     this.mapGrid.reset();
     this.eggPlacingPhase   = false;
+    this.waveClearPhase    = false;
     this.gameOver          = false;
     this._isPaused        = false;
     this.accumulated      = 0;
@@ -205,6 +232,10 @@ export class Game {
     this.holdTimer        = 0;
     this.previewSpot      = null;
     this.previewSpawn     = null;
+    this.totalScore                = 0;
+    this.currentWaveEnemiesDefeated = 0;
+    this.currentWaveStartTime      = 0;
+    this.lastWaveScoreDetails      = null;
 
     this.enemies = [];
     this.towers  = [];
@@ -214,14 +245,28 @@ export class Game {
     this.particlePool.releaseAll();
     this.waveManager.reset();
     this.player.resetTo(this.playerHome.x, this.playerHome.y);
+    this.player.setAttacking(false);
     this.playerDragPointerId = null;
     this.playerDragStart     = null;
+    this.attackTarget      = null;
+    this.attackCooldown    = 0;
+    this.isPlayerAttacking = false;
   }
 
   // ── Public getters ──────────────────────────────────────────────────────────
 
-  /** Called by the Start Wave button in the UI. */
-  startNextWave(): void { this.waveManager.startWave(); }
+  /** Called by the Start Wave / NEXT WAVE button in the UI. */
+  startNextWave(): void {
+    if (this.waveClearPhase) {
+      // Dismiss wave clear overlay → move to egg placing phase
+      this.waveClearPhase  = false;
+      this.eggPlacingPhase = true;
+      return;
+    }
+    this.currentWaveStartTime = performance.now();
+    this.currentWaveEnemiesDefeated = 0;
+    this.waveManager.startWave();
+  }
 
   get currentWave(): number  { return this.waveManager.currentWave; }
   get totalWaves(): number   { return this.waveManager.totalWaves; }
@@ -229,6 +274,7 @@ export class Game {
   get isGameClear(): boolean { return this.waveManager.isGameClear; }
   get isPaused(): boolean      { return this._isPaused; }
   get isEggPlacing(): boolean  { return this.eggPlacingPhase; }
+  get isWaveClear(): boolean   { return this.waveClearPhase; }
 
   // ── Main loop ───────────────────────────────────────────────────────────────
 
@@ -239,8 +285,8 @@ export class Game {
     const elapsed = Math.min(timestamp - this.lastTimestamp, MAX_ACCUMULATED);
     this.lastTimestamp = timestamp;
 
-    // Advance simulation only when not paused, game-over, or cleared
-    if (!this.gameOver && !this._isPaused && !this.waveManager.isGameClear) {
+    // Advance simulation only when not paused, game-over, cleared, or showing wave clear overlay
+    if (!this.gameOver && !this._isPaused && !this.waveManager.isGameClear && !this.waveClearPhase) {
       this.accumulated += elapsed;
       while (this.accumulated >= FIXED_TIMESTEP) {
         this.update(FIXED_TIMESTEP / 1000); // ms → s
@@ -294,6 +340,7 @@ export class Game {
           enemy.takeDamage(bullet.damage);
           this.spawnParticles(enemy.pos.x, enemy.pos.y, COLOR_HIT, PARTICLES_HIT);
           if (!enemy.isActive) {
+            this.currentWaveEnemiesDefeated += enemy.reward;
             this.spawnParticles(enemy.pos.x, enemy.pos.y, COLOR_KILL, PARTICLES_KILL);
           }
           this.bulletPool.release(bullet);
@@ -359,8 +406,35 @@ export class Game {
     // 8. Purge inactive enemies
     this.enemies = this.enemies.filter(e => e.isActive);
 
-    // 9. Player marlin — purely cosmetic, follows pointer drag
+    // 9. Player marlin — follows pointer; handles dash attack
     this.player.update(deltaTime);
+    if (this.isPlayerAttacking) {
+      if (!this.attackTarget || !this.attackTarget.isActive) {
+        this.endAttack();
+      } else {
+        const toTarget = this.attackTarget.pos.subtract(this.player.pos);
+        const dist     = toTarget.magnitude();
+        const hitDist  = this.attackTarget.radius + ATTACK_HIT_DIST;
+        if (dist <= hitDist) {
+          this.attackTarget.takeDamage(ATTACK_DAMAGE);
+          this.spawnParticles(this.attackTarget.pos.x, this.attackTarget.pos.y, COLOR_HIT, PARTICLES_HIT);
+          if (!this.attackTarget.isActive) {
+            this.currentWaveEnemiesDefeated += this.attackTarget.reward;
+            this.spawnParticles(this.attackTarget.pos.x, this.attackTarget.pos.y, COLOR_KILL, PARTICLES_KILL);
+          }
+          this.endAttack();
+        } else {
+          const dir    = toTarget.normalize();
+          const step   = Math.min(ATTACK_SPEED * deltaTime, dist);
+          const newPos = this.player.pos.add(dir.scale(step));
+          this.player.setPosition(newPos.x, newPos.y);
+          this.player.setFacing(Math.atan2(dir.y, dir.x));
+        }
+      }
+    }
+    if (this.attackCooldown > 0) {
+      this.attackCooldown = Math.max(0, this.attackCooldown - deltaTime);
+    }
 
     // 10. Refresh proximity preview (build spot or spawn warning)
     this.updatePreview();
@@ -439,6 +513,9 @@ export class Game {
     }
     // Player marlin — drawn above gameplay layer, below HUD/overlays
     this.player.draw(this.renderer);
+    if (this.attackCooldown > 0) {
+      this.player.drawCooldown(this.renderer, 1 - this.attackCooldown / ATTACK_COOLDOWN);
+    }
 
     // Egg placing overlay — player must choose a new goal location
     if (this.eggPlacingPhase) {
@@ -468,6 +545,10 @@ export class Game {
 
     if (this._isPaused && !this.gameOver && !this.waveManager.isGameClear) {
       this.drawPausedOverlay();
+    }
+
+    if (this.waveClearPhase && !this.gameOver && !this.waveManager.isGameClear) {
+      this.drawWaveClearOverlay();
     }
 
     if (this.gameOver) {
@@ -538,7 +619,7 @@ export class Game {
   }
 
   private handlePointerDown = (e: PointerEvent): void => {
-    if (this.gameOver || this._isPaused || this.waveManager.isGameClear) return;
+    if (this.gameOver || this._isPaused || this.waveManager.isGameClear || this.waveClearPhase) return;
 
     const canvasPt = this.pointerToCanvas(e);
 
@@ -576,7 +657,15 @@ export class Game {
       }
     }
 
-    // No build hold — start following the pointer immediately
+    // No build hold — attack nearest enemy if wave is active and cooldown ready
+    if (!this.waveManager.isInterWave && this.attackCooldown <= 0 && !this.isPlayerAttacking) {
+      const target = this.findNearestEnemy();
+      if (target) {
+        this.startAttack(target);
+        return;
+      }
+    }
+    // Otherwise follow pointer
     this.player.setTarget(canvasPt.x, canvasPt.y);
   };
 
@@ -595,7 +684,7 @@ export class Game {
       }
     }
 
-    if (!this.holdSpot) {
+    if (!this.holdSpot && !this.isPlayerAttacking) {
       this.player.setTarget(pt.x, pt.y);
     }
   };
@@ -609,6 +698,30 @@ export class Game {
     this.holdSpot  = null;
     this.holdTimer = 0;
   };
+
+  private findNearestEnemy(): Enemy | null {
+    let nearest: Enemy | null = null;
+    let nearestDist = Infinity;
+    for (const enemy of this.enemies) {
+      if (!enemy.isActive) continue;
+      const d = this.player.pos.distanceTo(enemy.pos);
+      if (d < nearestDist) { nearestDist = d; nearest = enemy; }
+    }
+    return nearest;
+  }
+
+  private startAttack(target: Enemy): void {
+    this.attackTarget      = target;
+    this.isPlayerAttacking = true;
+    this.player.setAttacking(true);
+  }
+
+  private endAttack(): void {
+    this.isPlayerAttacking = false;
+    this.player.setAttacking(false);
+    this.attackCooldown = ATTACK_COOLDOWN;
+    this.attackTarget   = null;
+  }
 
   private placeAtSpot(spot: PlacementSpot): void {
     const key = `${spot.col},${spot.row}`;
@@ -718,9 +831,17 @@ export class Game {
     const center   = this.mapGrid.spotCenter(this.holdSpot.col, this.holdSpot.row);
     const progress = Math.min(this.holdTimer / HOLD_DURATION, 1);
 
-    // Semi-transparent entity preview
+    // Birthing egg animation — same transparency as the entity
     ctx.save();
-    ctx.globalAlpha = 0.40;
+    ctx.globalAlpha = 0.25 + progress * 0.30;
+    this.drawBirthingEgg(ctx, center.x, center.y, progress);
+    ctx.restore();
+
+    // Entity floats up from the crack, semi-transparent
+    const floatOffset = (1 - progress) * TILE_SIZE * 0.4;
+    ctx.save();
+    ctx.globalAlpha = 0.25 + progress * 0.30;
+    ctx.translate(0, floatOffset);
     if (this.holdSpot.kind === 'tower') {
       createTower(this.holdSpot.col, this.holdSpot.row).draw(this.renderer);
     } else {
@@ -728,12 +849,12 @@ export class Game {
     }
     ctx.restore();
 
-    // Progress ring — white arc from top, fills clockwise
+    // Progress ring surrounding the birthing egg
     ctx.save();
     ctx.beginPath();
     ctx.arc(
       center.x, center.y,
-      22,
+      26,
       -Math.PI / 2,
       -Math.PI / 2 + Math.PI * 2 * progress,
     );
@@ -743,53 +864,63 @@ export class Game {
     ctx.setLineDash([]);
     ctx.stroke();
     ctx.restore();
-
-    // Gold cost indicator just above the spot
-    this.drawBuildCostIndicator(center.x, center.y);
   }
 
-  private drawBuildCostIndicator(spotX: number, spotY: number): void {
-    if (!this.holdSpot) return;
-    const cost   = this.holdSpot.kind === 'tower' ? towerCost() : CORAL_COST;
-    const ctx    = this.renderer.context;
-
-    const COIN_R = 9;
-    const GAP    = 5;
-    const STEP   = COIN_R * 2 + GAP;
-    const totalW = cost * STEP - GAP;
-    const startX = spotX - totalW / 2 + COIN_R;
-    // Place pill above the progress ring (ring radius = 22) with 8px gap
-    const coinY  = spotY - 22 - 8 - COIN_R;
-    const PAD_H  = 9;
-    const PAD_W  = 16;
-    const pillX  = startX - COIN_R - PAD_W;
-    const pillY  = coinY - COIN_R - PAD_H;
-    const pillW  = totalW + PAD_W * 2;
-    const pillH  = COIN_R * 2 + PAD_H * 2;
-    const pillR  = pillH / 2;
+  private drawBirthingEgg(ctx: CanvasRenderingContext2D, cx: number, cy: number, progress: number): void {
+    const eggR        = 18;
+    // Pivot below egg center — top of each half swings wider than bottom (kusudama effect)
+    const pivotOffset = eggR * 0.65;
+    const maxAngle    = progress * Math.PI * 0.42;
 
     ctx.save();
 
-    // Pill background (manual rounded rect for compatibility)
+    // Glow grows with progress (unchanged)
+    const glowAlpha = 0.30 + progress * 0.55;
+    const glowR     = eggR * (0.5 + progress * 0.9);
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+    grd.addColorStop(0,   `rgba(255, 255, 200, ${glowAlpha.toFixed(2)})`);
+    grd.addColorStop(0.5, `rgba(255, 220, 80,  ${(glowAlpha * 0.5).toFixed(2)})`);
+    grd.addColorStop(1,   'rgba(255, 200, 50, 0)');
     ctx.beginPath();
-    ctx.moveTo(pillX + pillR, pillY);
-    ctx.lineTo(pillX + pillW - pillR, pillY);
-    ctx.quadraticCurveTo(pillX + pillW, pillY,        pillX + pillW, pillY + pillR);
-    ctx.lineTo(pillX + pillW, pillY + pillH - pillR);
-    ctx.quadraticCurveTo(pillX + pillW, pillY + pillH, pillX + pillW - pillR, pillY + pillH);
-    ctx.lineTo(pillX + pillR, pillY + pillH);
-    ctx.quadraticCurveTo(pillX, pillY + pillH,         pillX, pillY + pillH - pillR);
-    ctx.lineTo(pillX, pillY + pillR);
-    ctx.quadraticCurveTo(pillX, pillY,                 pillX + pillR, pillY);
-    ctx.closePath();
-    ctx.fillStyle   = 'rgba(0, 0, 0, 0.68)';
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 185, 55, 0.55)';
+
+    // Left half — rotates counterclockwise around pivot below center
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.translate(0, pivotOffset);
+    ctx.rotate(-maxAngle);
+    ctx.translate(0, -pivotOffset);
+    ctx.beginPath();
+    ctx.arc(0, 0, eggR, Math.PI / 2, 3 * Math.PI / 2); // bottom→left→top arc
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(255, 185, 55, 0.92)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 110, 10, 0.70)';
     ctx.lineWidth   = 1.5;
     ctx.stroke();
+    ctx.restore();
 
-    // Cracked egg icon — cost is always 1 cracked egg
-    this.drawHudCrackedEggIcon(ctx, startX, coinY, COIN_R);
+    // Right half — rotates clockwise around pivot below center
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.translate(0, pivotOffset);
+    ctx.rotate(maxAngle);
+    ctx.translate(0, -pivotOffset);
+    ctx.beginPath();
+    ctx.arc(0, 0, eggR, -Math.PI / 2, Math.PI / 2); // top→right→bottom arc
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(255, 210, 90, 0.92)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 110, 10, 0.70)';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(eggR * 0.25, -eggR * 0.35, eggR * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.60)';
+    ctx.fill();
+    ctx.restore();
 
     ctx.restore();
   }
@@ -854,22 +985,70 @@ export class Game {
       new Vector2D(133, 30), '#7ec8e3', 'bold 15px monospace',
     );
 
+    // ── Center-right: total score (always visible) ───────────────────────────
+    // Positioned left of the HTML button bar (pause/restart/start).
+    // Button bar width: 30+5+30+5+60+8(margin) = 138px → buttons start at x≈262.
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign    = 'right';
+    ctx.font         = 'bold 13px monospace';
+    ctx.fillStyle    = '#f1c40f';
+    ctx.fillText(`SCORE: ${this.totalScore}`, r.width - 142, CY);
+    ctx.restore();
   }
 
   private drawHudCrackedEggIcon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number): void {
-    this.drawHudEggIcon(ctx, cx, cy, r);
-    // Crack line overlay
+    const pivotOffset = r * 0.65;
+    const openAngle   = Math.PI * 0.42;
+
     ctx.save();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth   = Math.max(1, r * 0.14);
-    ctx.lineCap     = 'round';
-    ctx.lineJoin    = 'round';
+
+    // Glow
+    const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 1.1);
+    grd.addColorStop(0,   'rgba(255, 255, 200, 0.85)');
+    grd.addColorStop(0.5, 'rgba(255, 220, 80,  0.50)');
+    grd.addColorStop(1,   'rgba(255, 200, 50,  0)');
     ctx.beginPath();
-    ctx.moveTo(cx - r * 0.15, cy - r * 0.80);
-    ctx.lineTo(cx + r * 0.10, cy - r * 0.20);
-    ctx.lineTo(cx - r * 0.10, cy + r * 0.20);
-    ctx.lineTo(cx + r * 0.15, cy + r * 0.80);
+    ctx.arc(cx, cy, r * 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Left half — rotated counterclockwise around pivot below center
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.translate(0, pivotOffset);
+    ctx.rotate(-openAngle);
+    ctx.translate(0, -pivotOffset);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, Math.PI / 2, 3 * Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(255, 185, 55, 0.92)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 110, 10, 0.60)';
+    ctx.lineWidth   = 1;
     ctx.stroke();
+    ctx.restore();
+
+    // Right half — rotated clockwise around pivot below center
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.translate(0, pivotOffset);
+    ctx.rotate(openAngle);
+    ctx.translate(0, -pivotOffset);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+    ctx.fillStyle   = 'rgba(255, 210, 90, 0.92)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200, 110, 10, 0.60)';
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(r * 0.25, -r * 0.35, r * 0.26, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.70)';
+    ctx.fill();
+    ctx.restore();
+
     ctx.restore();
   }
 
@@ -921,32 +1100,103 @@ export class Game {
     r.context.textAlign = 'left';
   }
 
+  private drawWaveClearOverlay(): void {
+    const r   = this.renderer;
+    const ctx = r.context;
+    const cx  = r.width  / 2;
+    const cy  = r.height / 2;
+
+    ctx.fillStyle = 'rgba(0, 50, 20, 0.84)';
+    ctx.fillRect(0, 0, r.width, r.height);
+
+    ctx.font      = 'bold 52px monospace';
+    ctx.fillStyle = '#2ecc71';
+    ctx.textAlign = 'center';
+    ctx.fillText('WAVE CLEAR!', cx, cy - 78);
+
+    ctx.font      = '18px monospace';
+    ctx.fillStyle = '#5dade2';
+    ctx.fillText(`Wave ${this.waveManager.currentWave} Complete`, cx, cy - 48);
+
+    if (this.lastWaveScoreDetails !== null) {
+      const d = this.lastWaveScoreDetails;
+
+      ctx.font      = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillText('── Wave Score ──', cx, cy - 18);
+
+      ctx.font      = '15px monospace';
+      ctx.fillStyle = '#c8e88a';
+      ctx.fillText(`Enemies:    +${d.enemyScore}`, cx, cy + 6);
+      ctx.fillText(`Eggs:       +${d.eggScore}`,   cx, cy + 26);
+      ctx.fillText(`Time bonus: +${d.timeBonus}`,  cx, cy + 46);
+
+      ctx.font      = '13px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('────────────────────', cx, cy + 62);
+
+      ctx.font      = 'bold 16px monospace';
+      ctx.fillStyle = '#f1c40f';
+      ctx.fillText(`Wave Total: +${d.total}`, cx, cy + 82);
+
+      // Cracked eggs earned
+      this.drawHudCrackedEggIcon(ctx, cx - 52, cy + 106, 8);
+      ctx.font      = '15px monospace';
+      ctx.fillStyle = '#c8e88a';
+      ctx.fillText(`+${d.crackedEggsEarned}  GET!`, cx + 8, cy + 106);
+    }
+
+    ctx.font      = '12px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.42)';
+    ctx.fillText('Tap NEXT WAVE to continue', cx, cy + 136);
+
+    ctx.textAlign = 'left';
+  }
+
   private drawGameClear(): void {
-    const r  = this.renderer;
-    const cx = r.width  / 2;
-    const cy = r.height / 2;
+    const r   = this.renderer;
+    const ctx = r.context;
+    const cx  = r.width  / 2;
+    const cy  = r.height / 2;
 
-    r.context.fillStyle = 'rgba(0, 40, 80, 0.80)';
-    r.context.fillRect(0, 0, r.width, r.height);
+    ctx.fillStyle = 'rgba(0, 40, 80, 0.80)';
+    ctx.fillRect(0, 0, r.width, r.height);
 
-    r.context.font      = 'bold 72px monospace';
-    r.context.fillStyle = '#f1c40f';
-    r.context.textAlign = 'center';
-    r.context.fillText('CLEAR!', cx, cy - 10);
+    ctx.font      = 'bold 72px monospace';
+    ctx.fillStyle = '#f1c40f';
+    ctx.textAlign = 'center';
+    ctx.fillText('CLEAR!', cx, cy - 65);
 
-    r.context.font      = '22px monospace';
-    r.context.fillStyle = '#5dade2';
-    r.context.fillText('All sharks defeated!', cx, cy + 36);
+    ctx.font      = '22px monospace';
+    ctx.fillStyle = '#5dade2';
+    ctx.fillText('All sharks defeated!', cx, cy - 20);
 
-    r.context.font      = '16px monospace';
-    r.context.fillStyle = 'rgba(255,255,255,0.5)';
-    r.context.fillText(`Towers: ${this.towers.length}`, cx, cy + 70);
+    if (this.lastWaveScoreDetails !== null) {
+      const d = this.lastWaveScoreDetails;
+      ctx.font      = '14px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillText('── Last Wave Score ──', cx, cy + 15);
 
-    r.context.font      = '14px monospace';
-    r.context.fillStyle = 'rgba(255,255,255,0.35)';
-    r.context.fillText('Tap ↩ Restart to play again', cx, cy + 106);
+      ctx.font      = '16px monospace';
+      ctx.fillStyle = '#c8e88a';
+      ctx.fillText(`Enemies:     +${d.enemyScore}`, cx, cy + 40);
+      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 62);
+      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 84);
 
-    r.context.textAlign = 'left';
+      ctx.font      = '14px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('──────────────────────', cx, cy + 100);
+    }
+
+    ctx.font      = 'bold 20px monospace';
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText(`FINAL SCORE: ${this.totalScore}`, cx, cy + 122);
+
+    ctx.font      = '14px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText('Tap ↩ Restart to play again', cx, cy + 152);
+
+    ctx.textAlign = 'left';
   }
 
   // ─── Spawn markers & proximity preview ────────────────────────────────────
@@ -954,7 +1204,7 @@ export class Game {
   /** Red warning triangles on every spawn cell that has enemies in the next wave. */
   private drawSpawnMarkers(): void {
     if (!this.waveManager.isInterWave) return;
-    if (this.eggPlacingPhase || this.gameOver || this.waveManager.isGameClear) return;
+    if (this.eggPlacingPhase || this.waveClearPhase || this.gameOver || this.waveManager.isGameClear) return;
     if (this.waveManager.nextWaveEnemies.length === 0) return;
 
     const ctx    = this.renderer.context;
@@ -1062,35 +1312,60 @@ export class Game {
   }
 
   private drawGameOver(): void {
-    const r  = this.renderer;
-    const cx = r.width  / 2;
-    const cy = r.height / 2;
+    const r   = this.renderer;
+    const ctx = r.context;
+    const cx  = r.width  / 2;
+    const cy  = r.height / 2;
 
-    // Dark overlay
-    r.context.fillStyle = 'rgba(0, 0, 0, 0.72)';
-    r.context.fillRect(0, 0, r.width, r.height);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.fillRect(0, 0, r.width, r.height);
 
-    // "GAME OVER" text
-    r.context.font      = 'bold 64px monospace';
-    r.context.fillStyle = '#e74c3c';
-    r.context.textAlign = 'center';
-    r.context.fillText('GAME OVER', cx, cy - 10);
+    ctx.font      = 'bold 64px monospace';
+    ctx.fillStyle = '#e74c3c';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER', cx, cy - 65);
 
-    // Sub-text
-    r.context.font      = '20px monospace';
-    r.context.fillStyle = 'rgba(255,255,255,0.6)';
-    r.context.fillText(
-      `Wave ${this.waveManager.currentWave}   Towers: ${this.towers.length}`,
-      cx,
-      cy + 36,
+    ctx.font      = '20px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(
+      `Wave ${this.waveManager.currentWave} / ${this.waveManager.totalWaves}   Towers: ${this.towers.length}`,
+      cx, cy - 20,
     );
 
-    // Restart hint
-    r.context.font      = '14px monospace';
-    r.context.fillStyle = 'rgba(255,255,255,0.35)';
-    r.context.fillText('Tap ↩ Restart to play again', cx, cy + 72);
+    if (this.lastWaveScoreDetails !== null) {
+      const d = this.lastWaveScoreDetails;
+      ctx.font      = '14px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fillText('── Last Wave Score ──', cx, cy + 15);
 
-    // Reset textAlign (Renderer assumes left-aligned)
-    r.context.textAlign = 'left';
+      ctx.font      = '16px monospace';
+      ctx.fillStyle = '#c8e88a';
+      ctx.fillText(`Enemies:     +${d.enemyScore}`, cx, cy + 40);
+      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 62);
+      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 84);
+
+      ctx.font      = '14px monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('──────────────────────', cx, cy + 100);
+    }
+
+    ctx.font      = 'bold 18px monospace';
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText(`FINAL SCORE: ${this.totalScore}`, cx, cy + 122);
+
+    ctx.font      = '14px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText('Tap ↩ Restart to play again', cx, cy + 152);
+
+    ctx.textAlign = 'left';
+  }
+
+  private calculateTimeBonus(waveNumber: number, elapsedMs: number): number {
+    const sec     = elapsedMs / 1000;
+    const targets = [45, 60, 90, 120, 150]; // fast-clear thresholds per wave (seconds)
+    const target  = targets[Math.min(waveNumber - 1, targets.length - 1)];
+    if (sec <= target)      return 500;
+    if (sec <= target * 2)  return 200;
+    return 0;
   }
 }

@@ -7,6 +7,7 @@ import { Enemy, EnemyKind } from '../entities/Enemy.ts';
 import { Tower, createTower, towerCost } from '../entities/Tower.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { Particle } from '../entities/Particle.ts';
+import { Player } from '../entities/Player.ts';
 import { ObjectPool } from '../utils/ObjectPool.ts';
 
 const FIXED_TIMESTEP  = 1000 / 60;           // ms — 60 Hz logic tick
@@ -18,6 +19,14 @@ const INITIAL_CRACKED_EGGS = 3; // building resource at game start
 const DAMAGE_FLASH_DURATION = 0.4; // seconds — red screen flash on HP loss
 const HOLD_DURATION         = 2.0; // seconds to hold pointer before placing
 const CORAL_SLOW_RADIUS     = 30;  // px — enemies within this range are slowed
+const PLAYER_PREVIEW_RADIUS = 75;  // px — marlin reveals nearest spot within this range
+const PREVIEW_ALPHA         = 0.40;
+// px — half-extent of the square area around a previewed spot where long-press
+// triggers a build (cell itself + half-tile margin in each direction)
+const BUILD_TAP_HALF        = TILE_SIZE;
+// px — once the pointer slides past this distance from its press point, any
+// in-progress build hold is cancelled and the marlin begins following.
+const DRAG_CANCEL_THRESHOLD = 8;
 
 // Particle counts per event
 const PARTICLES_HIT  = 5;
@@ -39,6 +48,12 @@ export class Game {
   private readonly occupiedSpots = new Set<string>(); // 'col,row'
   private readonly bulletPool:   ObjectPool<Bullet>;
   private readonly particlePool: ObjectPool<Particle>;
+
+  // Player marlin — purely cosmetic for now (no gameplay effect)
+  private readonly player: Player;
+  private readonly playerHome: Vector2D;
+  private playerDragPointerId: number | null = null;
+  private playerDragStart: Vector2D | null = null;
 
   // Player state
   // goalEggs[gi] = remaining eggs at goal slot gi (0–EGGS_PER_GOAL)
@@ -62,6 +77,9 @@ export class Game {
   // Long-press placement state
   private holdSpot:  PlacementSpot | null = null;
   private holdTimer  = 0;
+
+  // Spot revealed by marlin proximity (nearest unoccupied spot within range)
+  private previewSpot: PlacementSpot | null = null;
 
   // Visual feedback
   private damageFlashTimer = 0; // counts down from DAMAGE_FLASH_DURATION after HP loss
@@ -97,7 +115,12 @@ export class Game {
         }
       },
     );
+    // Spawn player marlin in the lower-middle area, away from the HUD bar
+    this.playerHome = new Vector2D(canvas.width / 2, canvas.height - 80);
+    this.player     = new Player(this.playerHome.x, this.playerHome.y);
+
     canvas.addEventListener('pointerdown',   this.handlePointerDown);
+    canvas.addEventListener('pointermove',   this.handlePointerMove);
     canvas.addEventListener('pointerup',     this.handlePointerUp);
     canvas.addEventListener('pointercancel', this.handlePointerUp);
     canvas.addEventListener('pointerleave',  this.handlePointerUp);
@@ -114,6 +137,7 @@ export class Game {
     this.running = false;
     cancelAnimationFrame(this.rafId);
     this.canvas.removeEventListener('pointerdown',   this.handlePointerDown);
+    this.canvas.removeEventListener('pointermove',   this.handlePointerMove);
     this.canvas.removeEventListener('pointerup',     this.handlePointerUp);
     this.canvas.removeEventListener('pointercancel', this.handlePointerUp);
     this.canvas.removeEventListener('pointerleave',  this.handlePointerUp);
@@ -136,6 +160,7 @@ export class Game {
     this.damageFlashTimer = 0;
     this.holdSpot         = null;
     this.holdTimer        = 0;
+    this.previewSpot      = null;
 
     this.enemies = [];
     this.towers  = [];
@@ -144,6 +169,9 @@ export class Game {
     this.bulletPool.releaseAll();
     this.particlePool.releaseAll();
     this.waveManager.reset();
+    this.player.resetTo(this.playerHome.x, this.playerHome.y);
+    this.playerDragPointerId = null;
+    this.playerDragStart     = null;
   }
 
   // ── Public getters ──────────────────────────────────────────────────────────
@@ -262,6 +290,31 @@ export class Game {
 
     // 8. Purge inactive enemies
     this.enemies = this.enemies.filter(e => e.isActive);
+
+    // 9. Player marlin — purely cosmetic, follows pointer drag
+    this.player.update(deltaTime);
+
+    // 10. Refresh nearest-spot preview based on the marlin's position
+    this.updatePreviewSpot();
+  }
+
+  private updatePreviewSpot(): void {
+    if (this.eggPlacingPhase || this.crackedEggs < 1) {
+      this.previewSpot = null;
+      return;
+    }
+    let best: PlacementSpot | null = null;
+    let bestDist = PLAYER_PREVIEW_RADIUS;
+    for (const spot of this.mapGrid.allSpots) {
+      if (this.occupiedSpots.has(`${spot.col},${spot.row}`)) continue;
+      const center = this.mapGrid.spotCenter(spot.col, spot.row);
+      const d = this.player.pos.distanceTo(center);
+      if (d < bestDist) {
+        best = spot;
+        bestDist = d;
+      }
+    }
+    this.previewSpot = best;
   }
 
   // ─── Draw ──────────────────────────────────────────────────────────────────
@@ -288,10 +341,17 @@ export class Game {
     for (const particle of this.particlePool.all) {
       particle.draw(this.renderer);
     }
+    // Player marlin — drawn above gameplay layer, below HUD/overlays
+    this.player.draw(this.renderer);
 
     // Egg placing overlay — player must choose a new goal location
     if (this.eggPlacingPhase) {
       this.drawEggPlacingOverlay();
+    }
+
+    // Marlin-proximity preview — shown when no hold is in progress
+    if (this.holdSpot === null) {
+      this.drawProximityPreview();
     }
 
     // Long-press preview — drawn above game objects, below HUD
@@ -325,23 +385,35 @@ export class Game {
     }
   }
 
-  private pointerToTile(e: PointerEvent): { col: number; row: number } {
+  private pointerToCanvas(e: PointerEvent): Vector2D {
     const rect   = this.canvas.getBoundingClientRect();
     const scaleX = this.renderer.width  / rect.width;
     const scaleY = this.renderer.height / rect.height;
-    return this.mapGrid.pixelToGrid(new Vector2D(
+    return new Vector2D(
       (e.clientX - rect.left) * scaleX,
       (e.clientY - rect.top)  * scaleY,
-    ));
+    );
+  }
+
+  private pointerToTile(e: PointerEvent): { col: number; row: number } {
+    return this.mapGrid.pixelToGrid(this.pointerToCanvas(e));
+  }
+
+  private clampToCanvas(v: Vector2D): Vector2D {
+    const r = this.player.hitRadius * 0.6;
+    const x = Math.max(r, Math.min(this.renderer.width  - r, v.x));
+    const y = Math.max(r, Math.min(this.renderer.height - r, v.y));
+    return new Vector2D(x, y);
   }
 
   private handlePointerDown = (e: PointerEvent): void => {
     if (this.gameOver || this._isPaused || this.waveManager.isGameClear) return;
 
-    const { col, row } = this.pointerToTile(e);
+    const canvasPt = this.pointerToCanvas(e);
 
     // ── Egg placing phase: tap an inactive goal slot to activate it ──────────
     if (this.eggPlacingPhase) {
+      const { col, row } = this.pointerToTile(e);
       for (let gi = 0; gi < GOAL_COLS.length; gi++) {
         if (this.activeGoalIndices.has(gi)) continue;
         if (row === GOAL_ROW && col === GOAL_COLS[gi]) {
@@ -351,20 +423,58 @@ export class Game {
           break;
         }
       }
-      return; // no building during egg placing
+      return; // no building / dragging during egg placing
     }
 
-    // ── Normal inter-wave building ────────────────────────────────────────────
-    const spot = this.mapGrid.getSpot(col, row);
-    if (!spot) return;
-    if (this.occupiedSpots.has(`${col},${row}`)) return;
-    if (this.crackedEggs < 1) return;
+    // ── Begin pointer interaction: tap-and-slide controls the marlin from
+    //    anywhere; if the press lands inside a previewed build area, defer
+    //    marlin movement and start a hold timer instead. Sliding past the
+    //    cancel threshold (handled in pointermove) reverts to drag-only. ─────
+    this.playerDragPointerId = e.pointerId;
+    this.playerDragStart     = canvasPt.clone();
+    this.canvas.setPointerCapture?.(e.pointerId);
 
-    this.holdSpot  = spot;
-    this.holdTimer = 0;
+    if (this.previewSpot && this.crackedEggs >= 1) {
+      const center = this.mapGrid.spotCenter(this.previewSpot.col, this.previewSpot.row);
+      const dx = Math.abs(canvasPt.x - center.x);
+      const dy = Math.abs(canvasPt.y - center.y);
+      if (dx <= BUILD_TAP_HALF && dy <= BUILD_TAP_HALF) {
+        this.holdSpot  = this.previewSpot;
+        this.holdTimer = 0;
+        return; // marlin stays still while the user holds to build
+      }
+    }
+
+    // No build hold — start following the pointer immediately
+    this.player.setTarget(canvasPt.x, canvasPt.y);
   };
 
-  private handlePointerUp = (): void => {
+  private handlePointerMove = (e: PointerEvent): void => {
+    if (this.playerDragPointerId !== e.pointerId) return;
+    const pt = this.clampToCanvas(this.pointerToCanvas(e));
+
+    // Slide past the threshold cancels any in-progress build hold and lets
+    // the marlin start following the pointer.
+    if (this.holdSpot && this.playerDragStart) {
+      const dx = pt.x - this.playerDragStart.x;
+      const dy = pt.y - this.playerDragStart.y;
+      if (dx * dx + dy * dy > DRAG_CANCEL_THRESHOLD * DRAG_CANCEL_THRESHOLD) {
+        this.holdSpot  = null;
+        this.holdTimer = 0;
+      }
+    }
+
+    if (!this.holdSpot) {
+      this.player.setTarget(pt.x, pt.y);
+    }
+  };
+
+  private handlePointerUp = (e?: PointerEvent): void => {
+    if (e && this.playerDragPointerId === e.pointerId) {
+      this.canvas.releasePointerCapture?.(e.pointerId);
+      this.playerDragPointerId = null;
+      this.playerDragStart     = null;
+    }
     this.holdSpot  = null;
     this.holdTimer = 0;
   };
@@ -557,12 +667,27 @@ export class Game {
     const r = this.renderer;
     for (const spot of this.mapGrid.allSpots) {
       if (this.occupiedSpots.has(`${spot.col},${spot.row}`)) continue;
+      // The marlin-revealed spot is rendered as a translucent preview instead
+      if (this.previewSpot && spot.col === this.previewSpot.col && spot.row === this.previewSpot.row) continue;
       const center = this.mapGrid.spotCenter(spot.col, spot.row);
       const color  = spot.kind === 'tower'
         ? 'rgba(255, 255, 255, 0.80)'
         : 'rgba(255, 140, 100, 0.90)'; // coral-coloured dot for coral spots
       r.drawCircle(center, 5, color);
     }
+  }
+
+  private drawProximityPreview(): void {
+    if (!this.previewSpot) return;
+    const ctx = this.renderer.context;
+    ctx.save();
+    ctx.globalAlpha = PREVIEW_ALPHA;
+    if (this.previewSpot.kind === 'tower') {
+      createTower(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);
+    } else {
+      new CoralWall(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);
+    }
+    ctx.restore();
   }
 
   private drawDamageFlash(): void {

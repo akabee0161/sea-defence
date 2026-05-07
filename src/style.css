@@ -77,9 +77,9 @@ body {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* Start Wave — wide, green accent */
+/* Start Wave — green accent */
 .start-btn {
-  width: 60px;
+  width: 40px;
   height: 30px;
   font-size: 1.05rem;
   border-color: rgba(46, 204, 113, 0.65);

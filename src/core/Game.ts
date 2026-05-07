@@ -986,14 +986,14 @@ export class Game {
     );
 
     // ── Center-right: total score (always visible) ───────────────────────────
-    // Positioned left of the HTML button bar (pause/restart/start).
-    // Button bar width: 30+5+30+5+60+8(margin) = 138px → buttons start at x≈262.
+    // HTML ボタンバーはCSS固定ピクセルだがキャンバスは画面幅にスケールされるため、
+    // 余裕を持たせて右端から160px（canvas座標）に右揃えで配置する。
     ctx.save();
     ctx.textBaseline = 'middle';
     ctx.textAlign    = 'right';
     ctx.font         = 'bold 13px monospace';
     ctx.fillStyle    = '#f1c40f';
-    ctx.fillText(`SCORE: ${this.totalScore}`, r.width - 142, CY);
+    ctx.fillText(`SCORE: ${this.totalScore}`, r.width - 160, CY);
     ctx.restore();
   }
 

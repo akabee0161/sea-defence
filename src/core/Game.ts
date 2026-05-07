@@ -729,7 +729,7 @@ export class Game {
 
     if (this.crackedEggs < 1) return;
     this.crackedEggs -= 1;
-    if (spot.kind === 'tower') {
+    if (spot.kind !== 'coral') {
       this.towers.push(createTower(spot.col, spot.row));
     } else {
       this.corals.push(new CoralWall(spot.col, spot.row));
@@ -842,7 +842,7 @@ export class Game {
     ctx.save();
     ctx.globalAlpha = 0.25 + progress * 0.30;
     ctx.translate(0, floatOffset);
-    if (this.holdSpot.kind === 'tower') {
+    if (this.holdSpot.kind !== 'coral') {
       createTower(this.holdSpot.col, this.holdSpot.row).draw(this.renderer);
     } else {
       new CoralWall(this.holdSpot.col, this.holdSpot.row).draw(this.renderer);
@@ -942,7 +942,7 @@ export class Game {
     const ctx = this.renderer.context;
     ctx.save();
     ctx.globalAlpha = PREVIEW_ALPHA;
-    if (this.previewSpot.kind === 'tower') {
+    if (this.previewSpot.kind !== 'coral') {
       createTower(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);
     } else {
       new CoralWall(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);

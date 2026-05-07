@@ -932,9 +932,7 @@ export class Game {
       // The marlin-revealed spot is rendered as a translucent preview instead
       if (this.previewSpot && spot.col === this.previewSpot.col && spot.row === this.previewSpot.row) continue;
       const center = this.mapGrid.spotCenter(spot.col, spot.row);
-      const color  = spot.kind === 'tower'
-        ? 'rgba(255, 255, 255, 0.80)'
-        : 'rgba(255, 140, 100, 0.90)'; // coral-coloured dot for coral spots
+      const color  = 'rgba(255, 255, 255, 0.80)';
       r.drawCircle(center, 5, color);
     }
   }

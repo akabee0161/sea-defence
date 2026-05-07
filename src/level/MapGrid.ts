@@ -57,16 +57,27 @@ const PLACEMENT_SPOTS: PlacementSpot[] = [
   { col: 1, row: 10, kind: 'eel' },
   { col: 4, row: 10, kind: 'octopus' },
   { col: 6, row: 10, kind: 'eel' },
+  { col: 4, row: 12, kind: 'octopus' },
+  { col: 1, row: 11, kind: 'octopus' },
   // ── PATH スポット (row 2): Coral と HermitCrab ───────────────────────────────
   { col: 0, row:  2, kind: 'coral' },
   { col: 7, row:  2, kind: 'coral' },
-  { col: 1, row:  2, kind: 'hermit_crab' },
-  { col: 3, row:  2, kind: 'hermit_crab' },
-  { col: 5, row:  2, kind: 'hermit_crab' },
+  { col: 1, row:  5, kind: 'coral' },
+  { col: 1, row:  7, kind: 'coral' },
+  { col: 0, row:  9, kind: 'coral' },
+  { col: 2, row:  11, kind: 'coral' },
+  { col: 3, row:  9, kind: 'coral' },
+  { col: 5, row:  10, kind: 'coral' },
+  { col: 7, row:  8, kind: 'coral' },
+  { col: 1, row:  3, kind: 'hermit_crab' },
+  { col: 3, row:  5, kind: 'hermit_crab' },
+  { col: 5, row:  7, kind: 'hermit_crab' },
   // ── PATH スポット (row 4): Crab ───────────────────────────────────────────────
   // row 4 は全列が PATH タイル → CrabTower が 0-7 の全幅 400px を巡回できる
   { col: 2, row:  4, kind: 'crab' },
   { col: 5, row:  4, kind: 'crab' },
+  { col: 1, row:  8, kind: 'crab' },
+  { col: 6, row:  8, kind: 'crab' },
 ];
 
 export enum TileType {

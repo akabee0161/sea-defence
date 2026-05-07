@@ -16,7 +16,7 @@ interface EnemyConfig {
 }
 
 const CONFIGS: Record<EnemyKind, EnemyConfig> = {
-  small:  { radius: 11, speed: 180, maxHp: 60,  reward: 1, bodyColor: '#5dade2', finColor: '#2471a3' },
+  small:  { radius: 11, speed: 180, maxHp: 80,  reward: 1, bodyColor: '#5dade2', finColor: '#2471a3' },
   medium: { radius: 17, speed: 120, maxHp: 200, reward: 1, bodyColor: '#f4d03f', finColor: '#b7950b' },
   boss:   { radius: 30, speed: 80, maxHp: 800, reward: 1, bodyColor: '#e74c3c', finColor: '#922b21' },
 };

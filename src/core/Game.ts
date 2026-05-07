@@ -941,10 +941,7 @@ export class Game {
       // The marlin-revealed spot is rendered as a translucent preview instead
       if (this.previewSpot && spot.col === this.previewSpot.col && spot.row === this.previewSpot.row) continue;
       const center = this.mapGrid.spotCenter(spot.col, spot.row);
-      // BUILDABLE kinds (octopus, eel) → white dot; PATH kinds → orange dot
-      const color  = (spot.kind === 'octopus' || spot.kind === 'eel')
-        ? 'rgba(255, 255, 255, 0.80)'
-        : 'rgba(255, 140, 100, 0.90)';
+      const color  = 'rgba(255, 255, 255, 0.80)';
       r.drawCircle(center, 5, color);
     }
   }

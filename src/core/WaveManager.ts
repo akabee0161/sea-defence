@@ -20,11 +20,6 @@ const WAVE_DEFS: { spawns: SpawnEntry[] }[] = [
     { kind: 'small', spawnIdx: 0 },
     { kind: 'small', spawnIdx: 0 },
     { kind: 'small', spawnIdx: 0 },
-    { kind: 'small', spawnIdx: 0 },
-    { kind: 'small', spawnIdx: 0 },
-    { kind: 'small', spawnIdx: 0 },
-    { kind: 'small', spawnIdx: 0 },
-    { kind: 'small', spawnIdx: 0 },
   ]},
   // Wave 2 — small ×10 (spawnIdx 0), medium ×4 (spawnIdx 1)
   { spawns: [
@@ -35,12 +30,9 @@ const WAVE_DEFS: { spawns: SpawnEntry[] }[] = [
     { kind: 'small',  spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 0 },
-    { kind: 'small',  spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 0 },
     { kind: 'small',  spawnIdx: 0 },
-    { kind: 'small',  spawnIdx: 0 },
-    { kind: 'medium', spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 0 },
   ]},
   // Wave 3 — small ×6 (spawnIdx 0,2), medium ×10 (spawnIdx 0,1,2)
@@ -64,21 +56,30 @@ const WAVE_DEFS: { spawns: SpawnEntry[] }[] = [
   ]},
   // Wave 4 — medium ×12, spawnIdx round-robin 0–3
   { spawns: [
+    { kind: 'small',  spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 1 },
+    { kind: 'small',  spawnIdx: 4 },
     { kind: 'medium', spawnIdx: 2 },
     { kind: 'medium', spawnIdx: 3 },
+    { kind: 'small',  spawnIdx: 1 },
     { kind: 'medium', spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 1 },
+    { kind: 'small',  spawnIdx: 1 },
     { kind: 'medium', spawnIdx: 2 },
     { kind: 'medium', spawnIdx: 3 },
+    { kind: 'boss',   spawnIdx: 3 },
     { kind: 'medium', spawnIdx: 0 },
+    { kind: 'small',  spawnIdx: 1 },
     { kind: 'medium', spawnIdx: 1 },
     { kind: 'medium', spawnIdx: 2 },
+    { kind: 'small',  spawnIdx: 3 },
     { kind: 'medium', spawnIdx: 3 },
+    { kind: 'small',  spawnIdx: 4 },
   ]},
   // Wave 5 — small ×6, medium ×4, boss ×2; bosses on spawnIdx 0
   { spawns: [
+    { kind: 'boss',   spawnIdx: 0 },
     { kind: 'small',  spawnIdx: 0 },
     { kind: 'medium', spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 2 },
@@ -88,9 +89,10 @@ const WAVE_DEFS: { spawns: SpawnEntry[] }[] = [
     { kind: 'medium', spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 2 },
     { kind: 'medium', spawnIdx: 3 },
-    { kind: 'boss',   spawnIdx: 0 },
+    { kind: 'boss',   spawnIdx: 1 },
     { kind: 'small',  spawnIdx: 4 },
     { kind: 'small',  spawnIdx: 2 },
+    { kind: 'boss',   spawnIdx: 4 },
   ]},
 ];
 

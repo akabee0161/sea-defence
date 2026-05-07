@@ -332,6 +332,207 @@ export class CrabTower extends Tower {
   }
 }
 
+// ── Hermit Crab Tower ─────────────────────────────────────────────────────────
+
+type HermitCrabState = 'hidden' | 'emerging' | 'attacking' | 'retreating';
+
+export class HermitCrabTower extends Tower {
+  private hcState:    HermitCrabState = 'hidden';
+  private stateTimer  = 0;
+  private attackTimer = 0;
+
+  private static readonly EMERGE_TIME  = 0.4;  // s
+  private static readonly ATTACK_TIME  = 0.8;  // s
+  private static readonly RETREAT_TIME = 0.6;  // s
+
+  constructor(col: number, row: number) {
+    // range=70, fireRate=1.5, cost=1, damage=25, bulletSpeed=0
+    super(col, row, 70, 1.5, 1, 25, 0);
+  }
+
+  override update(
+    deltaTime: number,
+    enemies: Enemy[],
+    _pool: ObjectPool<Bullet> | null,
+  ): void {
+    switch (this.hcState) {
+      case 'hidden': {
+        const nearby = this.findNearest(enemies);
+        if (nearby !== null) {
+          this.hcState    = 'emerging';
+          this.stateTimer = 0;
+        }
+        break;
+      }
+      case 'emerging': {
+        this.stateTimer += deltaTime;
+        if (this.stateTimer >= HermitCrabTower.EMERGE_TIME) {
+          this.hcState     = 'attacking';
+          this.attackTimer = 0;
+          this.cooldown    = 0;
+        }
+        break;
+      }
+      case 'attacking': {
+        this.attackTimer += deltaTime;
+        if (this.cooldown > 0) {
+          this.cooldown = Math.max(0, this.cooldown - deltaTime);
+        }
+        const nearest = this.findNearest(enemies);
+        this.target = nearest;
+        if (nearest !== null && this.cooldown <= 0) {
+          nearest.takeDamage(this.damage);
+          this.cooldown = 1 / this.fireRate;
+        }
+        if (this.attackTimer >= HermitCrabTower.ATTACK_TIME) {
+          this.hcState    = 'retreating';
+          this.stateTimer = 0;
+          this.target     = null;
+        }
+        break;
+      }
+      case 'retreating': {
+        this.stateTimer += deltaTime;
+        if (this.stateTimer >= HermitCrabTower.RETREAT_TIME) {
+          this.hcState    = 'hidden';
+          this.stateTimer = 0;
+        }
+        break;
+      }
+    }
+  }
+
+  private findNearest(enemies: Enemy[]): Enemy | null {
+    let nearest: Enemy | null = null;
+    let nearestDist = Infinity;
+    for (const enemy of enemies) {
+      if (!enemy.isActive) continue;
+      const dist = this.position.distanceTo(enemy.pos);
+      if (dist <= this.range && dist < nearestDist) {
+        nearestDist = dist;
+        nearest     = enemy;
+      }
+    }
+    return nearest;
+  }
+
+  /** 0 = 完全に貝殻 / 1 = 完全に出現 */
+  get emergeProgress(): number {
+    switch (this.hcState) {
+      case 'hidden':     return 0;
+      case 'emerging':   return this.stateTimer / HermitCrabTower.EMERGE_TIME;
+      case 'attacking':  return 1;
+      case 'retreating': return 1 - this.stateTimer / HermitCrabTower.RETREAT_TIME;
+    }
+  }
+
+  get currentHcState(): HermitCrabState { return this.hcState; }
+
+  override draw(renderer: Renderer): void {
+    const ctx  = renderer.context;
+    const cx   = this.position.x;
+    const cy   = this.position.y;
+    const prog = this.emergeProgress;
+
+    // Range aura
+    renderer.drawCircle(
+      this.position, this.range, 'rgba(0,0,0,0)',
+      prog > 0 ? 'rgba(142,107,34,0.25)' : 'rgba(142,107,34,0.08)', 1,
+    );
+
+    // ── Shell (fades slightly as crab emerges) ────────────────────────────────
+    ctx.save();
+    ctx.globalAlpha *= (1 - prog * 0.6);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 14);
+    ctx.bezierCurveTo(cx + 13, cy - 10, cx + 13,  cy + 4, cx, cy + 6);
+    ctx.bezierCurveTo(cx - 13, cy + 4,  cx - 13, cy - 10, cx, cy - 14);
+    ctx.fillStyle   = '#8e6030';
+    ctx.fill();
+    ctx.strokeStyle = '#5a3a10';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+    // Spiral detail
+    ctx.beginPath();
+    ctx.arc(cx + 2, cy - 2, 4.5, 0.2, Math.PI * 1.6);
+    ctx.strokeStyle = '#5a3a10';
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // ── Crab body (emerges from below) ────────────────────────────────────────
+    if (prog > 0.05) {
+      const emergeY = cy + 10 - prog * 18;
+
+      ctx.save();
+      ctx.globalAlpha *= prog;
+
+      // Legs
+      ctx.strokeStyle = '#a04000';
+      ctx.lineWidth   = 1.5;
+      ctx.lineCap     = 'round';
+      for (let i = 0; i < 2; i++) {
+        const ly = emergeY + i * 4;
+        ctx.beginPath();
+        ctx.moveTo(cx - 7, ly);
+        ctx.lineTo(cx - 14, ly + 6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(cx + 7, ly);
+        ctx.lineTo(cx + 14, ly + 6);
+        ctx.stroke();
+      }
+
+      // Body
+      ctx.beginPath();
+      ctx.ellipse(cx, emergeY, 10, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle   = '#e67e22';
+      ctx.fill();
+      ctx.strokeStyle = '#a04000';
+      ctx.lineWidth   = 1.5;
+      ctx.stroke();
+
+      // Eyes
+      for (const ox of [-4, 4] as const) {
+        ctx.beginPath();
+        ctx.arc(cx + ox, emergeY - 5, 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(cx + ox, emergeY - 5, 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = '#111';
+        ctx.fill();
+      }
+
+      // Claws (fully visible in attacking state)
+      if (prog >= 0.8 && this.hcState === 'attacking') {
+        const snapping = this.target !== null;
+        const clawGap  = snapping ? 3 : 8;
+        for (const side of [-1, 1] as const) {
+          const armX = cx + side * 16;
+          ctx.strokeStyle = '#a04000';
+          ctx.lineWidth   = 2.5;
+          ctx.lineCap     = 'round';
+          ctx.beginPath();
+          ctx.moveTo(cx + side * 8, emergeY);
+          ctx.lineTo(armX, emergeY - 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(armX, emergeY - 2);
+          ctx.lineTo(armX + side * 7, emergeY - 2 - clawGap);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(armX, emergeY - 2);
+          ctx.lineTo(armX + side * 7, emergeY - 2 + clawGap);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
+  }
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export function createTower(col: number, row: number): Tower {

@@ -533,6 +533,187 @@ export class HermitCrabTower extends Tower {
   }
 }
 
+// ── Eel Tower ─────────────────────────────────────────────────────────────────
+
+type EelState = 'idle' | 'stretching' | 'biting' | 'retracting';
+
+export class EelTower extends Tower {
+  private eelState:        EelState = 'idle';
+  private stretchProgress  = 0;
+  private biteTimer        = 0;
+  private stretchTarget:   Enemy | null  = null;
+  private stretchDir:      Vector2D      = Vector2D.zero();
+  private stretchMaxDist   = 0;
+
+  private static readonly STRETCH_TIME = 0.5;  // s
+  private static readonly BITE_TIME    = 0.2;  // s
+  private static readonly RETRACT_TIME = 0.4;  // s
+
+  constructor(col: number, row: number) {
+    // range=200, fireRate=0.4, cost=1, damage=60, bulletSpeed=0
+    super(col, row, 200, 0.4, 1, 60, 0);
+  }
+
+  override update(
+    deltaTime: number,
+    enemies: Enemy[],
+    _pool: ObjectPool<Bullet> | null,
+  ): void {
+    if (this.cooldown > 0) {
+      this.cooldown = Math.max(0, this.cooldown - deltaTime);
+    }
+
+    switch (this.eelState) {
+      case 'idle': {
+        if (this.cooldown <= 0) {
+          const nearest = this.findNearest(enemies);
+          if (nearest !== null) {
+            this.stretchTarget   = nearest;
+            const toEnemy        = nearest.pos.subtract(this.position);
+            this.stretchMaxDist  = Math.min(toEnemy.magnitude(), this.range);
+            this.stretchDir      = toEnemy.normalize();
+            this.stretchProgress = 0;
+            this.eelState        = 'stretching';
+          }
+        }
+        break;
+      }
+      case 'stretching': {
+        this.stretchProgress = Math.min(
+          1,
+          this.stretchProgress + deltaTime / EelTower.STRETCH_TIME,
+        );
+        if (this.stretchProgress >= 1) {
+          this.eelState  = 'biting';
+          this.biteTimer = 0;
+          if (this.stretchTarget !== null && this.stretchTarget.isActive) {
+            this.stretchTarget.takeDamage(this.damage);
+          }
+        }
+        break;
+      }
+      case 'biting': {
+        this.biteTimer += deltaTime;
+        if (this.biteTimer >= EelTower.BITE_TIME) {
+          this.eelState = 'retracting';
+        }
+        break;
+      }
+      case 'retracting': {
+        this.stretchProgress = Math.max(
+          0,
+          this.stretchProgress - deltaTime / EelTower.RETRACT_TIME,
+        );
+        if (this.stretchProgress <= 0) {
+          this.eelState      = 'idle';
+          this.cooldown      = 1 / this.fireRate;
+          this.stretchTarget = null;
+        }
+        break;
+      }
+    }
+  }
+
+  private findNearest(enemies: Enemy[]): Enemy | null {
+    let nearest: Enemy | null = null;
+    let nearestDist = Infinity;
+    for (const enemy of enemies) {
+      if (!enemy.isActive) continue;
+      const dist = this.position.distanceTo(enemy.pos);
+      if (dist <= this.range && dist < nearestDist) {
+        nearestDist = dist;
+        nearest     = enemy;
+      }
+    }
+    return nearest;
+  }
+
+  get headPos(): Vector2D {
+    return this.position.add(
+      this.stretchDir.scale(this.stretchProgress * this.stretchMaxDist),
+    );
+  }
+
+  get currentEelState(): EelState { return this.eelState; }
+
+  override draw(renderer: Renderer): void {
+    const ctx   = renderer.context;
+    const cx    = this.position.x;
+    const cy    = this.position.y;
+    const state = this.eelState;
+
+    renderer.drawCircle(
+      this.position, this.range, 'rgba(0,0,0,0)',
+      state !== 'idle' ? 'rgba(39,174,96,0.25)' : 'rgba(39,174,96,0.08)', 1,
+    );
+
+    if (state === 'idle') {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + 10);
+      ctx.bezierCurveTo(cx + 13, cy + 4,  cx - 13, cy,      cx,      cy - 5);
+      ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8,  cy - 18, cx,      cy - 18);
+      ctx.strokeStyle = '#27ae60';
+      ctx.lineWidth   = 6;
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy - 18, 6, 4, 0, 0, Math.PI * 2);
+      ctx.fillStyle   = '#1e8449';
+      ctx.fill();
+      ctx.strokeStyle = '#145a32';
+      ctx.lineWidth   = 1;
+      ctx.stroke();
+      return;
+    }
+
+    const head  = this.headPos;
+    const perp  = new Vector2D(-this.stretchDir.y, this.stretchDir.x);
+    const midX  = cx + (head.x - cx) * 0.5 + perp.x * 12 * this.stretchProgress;
+    const midY  = cy + (head.y - cy) * 0.5 + perp.y * 12 * this.stretchProgress;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(midX, midY, head.x, head.y);
+    ctx.strokeStyle = '#27ae60';
+    ctx.lineWidth   = 6;
+    ctx.lineCap     = 'round';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e8449';
+    ctx.fill();
+
+    const headAngle = Math.atan2(this.stretchDir.y, this.stretchDir.x);
+    ctx.save();
+    ctx.translate(head.x, head.y);
+    ctx.rotate(headAngle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
+    ctx.fillStyle   = state === 'biting' ? '#e74c3c' : '#1e8449';
+    ctx.fill();
+    ctx.strokeStyle = '#145a32';
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(8, -4);
+    ctx.lineTo(13, 0);
+    ctx.lineTo(8, 4);
+    ctx.closePath();
+    ctx.fillStyle = state === 'biting' ? '#c0392b' : '#1a1a1a';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-2, -3, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-1.5, -3, 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#111';
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export function createTower(col: number, row: number): Tower {

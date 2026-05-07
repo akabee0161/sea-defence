@@ -3,7 +3,7 @@ import { Renderer } from '../core/Renderer.ts';
 
 // ── Placement spots ───────────────────────────────────────────────────────────
 
-export type SpotKind = 'tower' | 'coral';
+export type SpotKind = 'octopus' | 'crab' | 'hermit_crab' | 'eel' | 'coral';
 
 export interface PlacementSpot {
   col: number;
@@ -45,26 +45,28 @@ const RAW_PATHS: [number, number][][] = [
   [[3,0],[3,4],[6,4],[6,8],[2,8],[2,12]],
 ];
 
-// Tower spots must be BUILDABLE (not on any path).
-// Coral spots must be PATH tiles (on a path).
 const PLACEMENT_SPOTS: PlacementSpot[] = [
-  // ── Tower spots ───────────────────────────────────────────────────────────
-  { col: 2, row:  2, kind: 'tower' }, // top area, left-centre gap
-  { col: 4, row:  2, kind: 'tower' }, // top area, centre gap
-  { col: 6, row:  1, kind: 'tower' }, // top area, right gap (upper)
-  { col: 6, row:  3, kind: 'tower' }, // top area, right gap (lower)
-  { col: 0, row:  6, kind: 'tower' }, // mid-left gap (between path rows 4 and 8)
-  { col: 2, row:  6, kind: 'tower' }, // mid-centre-left gap
-  { col: 7, row:  6, kind: 'tower' }, // mid-right gap
-  { col: 1, row: 10, kind: 'tower' }, // lower area, left gap
-  { col: 4, row: 10, kind: 'tower' }, // lower area, centre gap
-  { col: 6, row: 10, kind: 'tower' }, // lower area, right gap
-  // ── Coral spots (on PATH tiles, one per path) ─────────────────────────────
-  { col: 0, row:  2, kind: 'coral' }, // path 0 (col 0 vertical)
-  { col: 7, row:  2, kind: 'coral' }, // path 1 (col 7 vertical)
-  { col: 1, row:  2, kind: 'coral' }, // path 2 (col 1 vertical)
-  { col: 5, row:  2, kind: 'coral' }, // path 3 (col 5 vertical, rows 0-3)
-  { col: 3, row:  2, kind: 'coral' }, // path 4 (col 3 vertical)
+  // ── BUILDABLE スポット: Octopus と Eel を交互配置 ────────────────────────────
+  { col: 2, row:  2, kind: 'octopus' },
+  { col: 4, row:  2, kind: 'eel' },
+  { col: 6, row:  1, kind: 'octopus' },
+  { col: 6, row:  3, kind: 'eel' },
+  { col: 0, row:  6, kind: 'octopus' },
+  { col: 2, row:  6, kind: 'eel' },
+  { col: 7, row:  6, kind: 'octopus' },
+  { col: 1, row: 10, kind: 'eel' },
+  { col: 4, row: 10, kind: 'octopus' },
+  { col: 6, row: 10, kind: 'eel' },
+  // ── PATH スポット (row 2): Coral と HermitCrab ───────────────────────────────
+  { col: 0, row:  2, kind: 'coral' },
+  { col: 7, row:  2, kind: 'coral' },
+  { col: 1, row:  2, kind: 'hermit_crab' },
+  { col: 3, row:  2, kind: 'hermit_crab' },
+  { col: 5, row:  2, kind: 'hermit_crab' },
+  // ── PATH スポット (row 4): Crab ───────────────────────────────────────────────
+  // row 4 は全列が PATH タイル → CrabTower が 0-7 の全幅 400px を巡回できる
+  { col: 2, row:  4, kind: 'crab' },
+  { col: 5, row:  4, kind: 'crab' },
 ];
 
 export enum TileType {

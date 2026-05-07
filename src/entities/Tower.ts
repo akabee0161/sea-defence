@@ -3,7 +3,7 @@ import { Enemy } from './Enemy.ts';
 import { Bullet } from './Bullet.ts';
 import { ObjectPool } from '../utils/ObjectPool.ts';
 import { Renderer } from '../core/Renderer.ts';
-import { TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
+import { TILE_SIZE, GRID_OFFSET_Y, MapGrid } from '../level/MapGrid.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
 
 export enum TowerKind {
@@ -716,8 +716,38 @@ export class EelTower extends Tower {
 
 // ── Factory ───────────────────────────────────────────────────────────────────
 
-export function createTower(col: number, row: number): Tower {
-  return new OctopusTower(col, row);
+export function createTower(
+  kind:     TowerKind,
+  col:      number,
+  row:      number,
+  mapGrid?: MapGrid,
+): Tower {
+  switch (kind) {
+    case TowerKind.Octopus:
+      return new OctopusTower(col, row);
+
+    case TowerKind.Crab: {
+      // 配置 col から左右に連続する PATH タイルを収集して巡回範囲を決定
+      const patrolCols: number[] = [];
+      if (mapGrid) {
+        let left  = col;
+        let right = col;
+        while (left  > 0                && mapGrid.isPathTile(left  - 1, row)) left--;
+        while (right < mapGrid.cols - 1 && mapGrid.isPathTile(right + 1, row)) right++;
+        for (let c = left; c <= right; c++) {
+          if (mapGrid.isPathTile(c, row)) patrolCols.push(c);
+        }
+      }
+      if (patrolCols.length === 0) patrolCols.push(col);
+      return new CrabTower(col, row, patrolCols);
+    }
+
+    case TowerKind.HermitCrab:
+      return new HermitCrabTower(col, row);
+
+    case TowerKind.Eel:
+      return new EelTower(col, row);
+  }
 }
 
 export function towerCost(): number {

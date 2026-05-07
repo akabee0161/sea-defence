@@ -5,6 +5,13 @@ import { ObjectPool } from '../utils/ObjectPool.ts';
 import { Renderer } from '../core/Renderer.ts';
 import { TILE_SIZE, GRID_OFFSET_Y } from '../level/MapGrid.ts';
 
+export enum TowerKind {
+  Octopus    = 'octopus',
+  Crab       = 'crab',
+  HermitCrab = 'hermit_crab',
+  Eel        = 'eel',
+}
+
 export class Tower extends GameObject {
   readonly range: number;
   readonly fireRate: number;
@@ -12,8 +19,8 @@ export class Tower extends GameObject {
   readonly damage: number;
   readonly bulletSpeed: number;
 
-  private cooldown = 0;
-  private target: Enemy | null = null;
+  protected cooldown = 0;
+  protected target: Enemy | null = null;
 
   constructor(
     col: number,
@@ -67,7 +74,7 @@ export class Tower extends GameObject {
 
 // ── Octopus Tower ─────────────────────────────────────────────────────────────
 
-export class BasicTower extends Tower {
+export class OctopusTower extends Tower {
   constructor(col: number, row: number) {
     super(col, row);
   }
@@ -150,7 +157,7 @@ export class BasicTower extends Tower {
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export function createTower(col: number, row: number): Tower {
-  return new BasicTower(col, row);
+  return new OctopusTower(col, row);
 }
 
 export function towerCost(): number {

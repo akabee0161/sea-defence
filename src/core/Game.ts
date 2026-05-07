@@ -4,7 +4,7 @@ import { MapGrid, PlacementSpot, GOAL_COLS, GOAL_ROW, INITIAL_GOAL_IDX, TILE_SIZ
 import { CoralWall } from '../entities/CoralWall.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
 import { Enemy, EnemyKind, EATING_INTERVAL } from '../entities/Enemy.ts';
-import { Tower, createTower } from '../entities/Tower.ts';
+import { Tower, createTower, TowerKind } from '../entities/Tower.ts';
 import { Bullet } from '../entities/Bullet.ts';
 import { Particle } from '../entities/Particle.ts';
 import { Player } from '../entities/Player.ts';
@@ -729,10 +729,23 @@ export class Game {
 
     if (this.crackedEggs < 1) return;
     this.crackedEggs -= 1;
-    if (spot.kind !== 'coral') {
-      this.towers.push(createTower(spot.col, spot.row));
-    } else {
-      this.corals.push(new CoralWall(spot.col, spot.row));
+
+    switch (spot.kind) {
+      case 'octopus':
+        this.towers.push(createTower(TowerKind.Octopus, spot.col, spot.row));
+        break;
+      case 'crab':
+        this.towers.push(createTower(TowerKind.Crab, spot.col, spot.row, this.mapGrid));
+        break;
+      case 'hermit_crab':
+        this.towers.push(createTower(TowerKind.HermitCrab, spot.col, spot.row));
+        break;
+      case 'eel':
+        this.towers.push(createTower(TowerKind.Eel, spot.col, spot.row));
+        break;
+      case 'coral':
+        this.corals.push(new CoralWall(spot.col, spot.row));
+        break;
     }
     this.occupiedSpots.add(key);
   }
@@ -842,11 +855,7 @@ export class Game {
     ctx.save();
     ctx.globalAlpha = 0.25 + progress * 0.30;
     ctx.translate(0, floatOffset);
-    if (this.holdSpot.kind !== 'coral') {
-      createTower(this.holdSpot.col, this.holdSpot.row).draw(this.renderer);
-    } else {
-      new CoralWall(this.holdSpot.col, this.holdSpot.row).draw(this.renderer);
-    }
+    this.drawSpotEntity(this.holdSpot);
     ctx.restore();
 
     // Progress ring surrounding the birthing egg
@@ -932,7 +941,10 @@ export class Game {
       // The marlin-revealed spot is rendered as a translucent preview instead
       if (this.previewSpot && spot.col === this.previewSpot.col && spot.row === this.previewSpot.row) continue;
       const center = this.mapGrid.spotCenter(spot.col, spot.row);
-      const color  = 'rgba(255, 255, 255, 0.80)';
+      // BUILDABLE kinds (octopus, eel) → white dot; PATH kinds → orange dot
+      const color  = (spot.kind === 'octopus' || spot.kind === 'eel')
+        ? 'rgba(255, 255, 255, 0.80)'
+        : 'rgba(255, 140, 100, 0.90)';
       r.drawCircle(center, 5, color);
     }
   }
@@ -942,12 +954,30 @@ export class Game {
     const ctx = this.renderer.context;
     ctx.save();
     ctx.globalAlpha = PREVIEW_ALPHA;
-    if (this.previewSpot.kind !== 'coral') {
-      createTower(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);
-    } else {
-      new CoralWall(this.previewSpot.col, this.previewSpot.row).draw(this.renderer);
-    }
+    this.drawSpotEntity(this.previewSpot);
     ctx.restore();
+  }
+
+  /** スポット種別に応じたエンティティを描画（プレビュー・ホールド共用） */
+  private drawSpotEntity(spot: PlacementSpot): void {
+    switch (spot.kind) {
+      case 'octopus':
+        createTower(TowerKind.Octopus, spot.col, spot.row).draw(this.renderer);
+        break;
+      case 'crab':
+        // プレビュー時は mapGrid なし → patrolCols=[col] で静止描画
+        createTower(TowerKind.Crab, spot.col, spot.row).draw(this.renderer);
+        break;
+      case 'hermit_crab':
+        createTower(TowerKind.HermitCrab, spot.col, spot.row).draw(this.renderer);
+        break;
+      case 'eel':
+        createTower(TowerKind.Eel, spot.col, spot.row).draw(this.renderer);
+        break;
+      case 'coral':
+        new CoralWall(spot.col, spot.row).draw(this.renderer);
+        break;
+    }
   }
 
   private drawDamageFlash(): void {

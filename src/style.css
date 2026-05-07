@@ -16,6 +16,11 @@ body {
   align-items: center;
   overflow: hidden;
   font-family: monospace;
+  /* iOS セーフエリア（ノッチ・ホームインジケーター）対応 */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
@@ -34,6 +39,8 @@ body {
   aspect-ratio: 400 / 700;
   image-rendering: pixelated;
   touch-action: none; /* prevent scroll/zoom interference on mobile */
+  /* 小画面で上部が切れないようセーフエリアを除いた高さに収める */
+  max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 
 /* ── HUD button bar (overlaid on top of canvas) ─────────────────────────── */

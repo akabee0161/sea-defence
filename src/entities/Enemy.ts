@@ -4,7 +4,7 @@ import { Vector2D } from '../utils/Vector2D.ts';
 
 export type EnemyKind = 'small' | 'medium' | 'boss';
 
-export const EATING_INTERVAL = 2.0; // seconds between egg consumption at goal
+export const EATING_INTERVAL = 1.0; // seconds between egg consumption at goal
 
 interface EnemyConfig {
   radius:    number;
@@ -16,9 +16,9 @@ interface EnemyConfig {
 }
 
 const CONFIGS: Record<EnemyKind, EnemyConfig> = {
-  small:  { radius: 11, speed: 180, maxHp: 80,  reward: 1, bodyColor: '#5dade2', finColor: '#2471a3' },
-  medium: { radius: 17, speed: 120, maxHp: 200, reward: 1, bodyColor: '#f4d03f', finColor: '#b7950b' },
-  boss:   { radius: 30, speed: 80, maxHp: 800, reward: 1, bodyColor: '#e74c3c', finColor: '#922b21' },
+  small:  { radius: 11, speed: 240, maxHp: 80,  reward: 1, bodyColor: '#5dade2', finColor: '#2471a3' },
+  medium: { radius: 17, speed: 120, maxHp: 400, reward: 1, bodyColor: '#f4d03f', finColor: '#b7950b' },
+  boss:   { radius: 30, speed: 80, maxHp: 1200, reward: 1, bodyColor: '#e74c3c', finColor: '#922b21' },
 };
 
 const HP_BAR_H        = 5;

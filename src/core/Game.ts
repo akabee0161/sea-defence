@@ -317,7 +317,7 @@ export class Game {
     // 2. Apply coral slow effect and move enemies
     for (const enemy of this.enemies) {
       const slowed = this.corals.some(c => enemy.pos.distanceTo(c.pos) < CORAL_SLOW_RADIUS);
-      enemy.setSpeedMultiplier(slowed ? 0.35 : 1.0);
+      enemy.setSpeedMultiplier(slowed ? 0.20 : 1.0);
       enemy.update(deltaTime);
     }
 

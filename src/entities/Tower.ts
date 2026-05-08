@@ -27,7 +27,7 @@ export class Tower extends GameObject {
     col: number,
     row: number,
     range       = 150,
-    fireRate    = 1,
+    fireRate    = 2,
     cost        = 5,
     damage      = 20,
     bulletSpeed = 250,
@@ -167,8 +167,8 @@ export class CrabTower extends Tower {
   private static readonly FLASH_TIME  = 0.12; // seconds for claw-snap visual
 
   constructor(col: number, row: number, patrolCols: number[]) {
-    // range=45, fireRate=2.0, cost=1, damage=35, bulletSpeed=0 (直接攻撃)
-    super(col, row, 45, 2.0, 1, 35, 0);
+    // range=45, fireRate=2.0, cost=1, damage=60, bulletSpeed=0 (直接攻撃)
+    super(col, row, 45, 2.0, 1, 60, 0);
     this.patrolCols  = patrolCols.length > 0 ? patrolCols : [col];
     this.patrolIndex = Math.max(0, this.patrolCols.indexOf(col));
   }
@@ -346,8 +346,8 @@ export class HermitCrabTower extends Tower {
   private static readonly RETREAT_TIME = 0.6;  // s
 
   constructor(col: number, row: number) {
-    // range=70, fireRate=1.5, cost=1, damage=25, bulletSpeed=0
-    super(col, row, 70, 1.5, 1, 25, 0);
+    // range=70, fireRate=1.5, cost=1, damage=45, bulletSpeed=0
+    super(col, row, 70, 1.5, 1, 45, 0);
   }
 
   override update(
@@ -550,8 +550,8 @@ export class EelTower extends Tower {
   private static readonly RETRACT_TIME = 0.4;  // s
 
   constructor(col: number, row: number) {
-    // range=200, fireRate=0.4, cost=1, damage=60, bulletSpeed=0
-    super(col, row, 200, 0.4, 1, 60, 0);
+    // range=200, fireRate=0.4, cost=1, damage=45, bulletSpeed=0
+    super(col, row, 200, 0.4, 1, 45, 0);
   }
 
   override update(

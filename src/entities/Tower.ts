@@ -652,15 +652,15 @@ export class EelTower extends Tower {
       ctx.moveTo(cx, cy + 10);
       ctx.bezierCurveTo(cx + 13, cy + 4,  cx - 13, cy,      cx,      cy - 5);
       ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8,  cy - 18, cx,      cy - 18);
-      ctx.strokeStyle = '#27ae60';
+      ctx.strokeStyle = '#8f6446';
       ctx.lineWidth   = 6;
       ctx.lineCap     = 'round';
       ctx.stroke();
       ctx.beginPath();
       ctx.ellipse(cx, cy - 18, 6, 4, 0, 0, Math.PI * 2);
-      ctx.fillStyle   = '#1e8449';
+      ctx.fillStyle   = '#6f4d3e';
       ctx.fill();
-      ctx.strokeStyle = '#145a32';
+      ctx.strokeStyle = '#4b2d16';
       ctx.lineWidth   = 1;
       ctx.stroke();
       return;
@@ -674,14 +674,14 @@ export class EelTower extends Tower {
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.quadraticCurveTo(midX, midY, head.x, head.y);
-    ctx.strokeStyle = '#27ae60';
+    ctx.strokeStyle = '#8f6446';
     ctx.lineWidth   = 6;
     ctx.lineCap     = 'round';
     ctx.stroke();
 
     ctx.beginPath();
     ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#1e8449';
+    ctx.fillStyle = '#6f4d3e';
     ctx.fill();
 
     const headAngle = Math.atan2(this.stretchDir.y, this.stretchDir.x);
@@ -690,9 +690,9 @@ export class EelTower extends Tower {
     ctx.rotate(headAngle);
     ctx.beginPath();
     ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
-    ctx.fillStyle   = state === 'biting' ? '#e74c3c' : '#1e8449';
+    ctx.fillStyle   = state === 'biting' ? '#6f4d3e' : '#6f4d3e';
     ctx.fill();
-    ctx.strokeStyle = '#145a32';
+    ctx.strokeStyle = '#4b2d16';
     ctx.lineWidth   = 1;
     ctx.stroke();
     ctx.beginPath();
@@ -700,7 +700,7 @@ export class EelTower extends Tower {
     ctx.lineTo(13, 0);
     ctx.lineTo(8, 4);
     ctx.closePath();
-    ctx.fillStyle = state === 'biting' ? '#c0392b' : '#1a1a1a';
+    ctx.fillStyle = state === 'biting' ? '#6f4d3e' : '#6f4d3e';
     ctx.fill();
     ctx.beginPath();
     ctx.arc(-2, -3, 2.5, 0, Math.PI * 2);

@@ -5,6 +5,7 @@ import { ObjectPool } from '../utils/ObjectPool.ts';
 import { Renderer } from '../core/Renderer.ts';
 import { TILE_SIZE, GRID_OFFSET_Y, MapGrid } from '../level/MapGrid.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
+import { TOWER_DEFS } from '../defs/towerDefs.ts';
 
 export enum TowerKind {
   Octopus    = 'octopus',
@@ -14,30 +15,24 @@ export enum TowerKind {
 }
 
 export class Tower extends GameObject {
-  readonly range: number;
-  readonly fireRate: number;
-  readonly cost: number;
-  readonly damage: number;
+  readonly range:       number;
+  readonly fireRate:    number;
+  readonly cost:        number;
+  readonly damage:      number;
   readonly bulletSpeed: number;
 
   protected cooldown = 0;
   protected target: Enemy | null = null;
 
-  constructor(
-    col: number,
-    row: number,
-    range       = 150,
-    fireRate    = 2,
-    cost        = 5,
-    damage      = 20,
-    bulletSpeed = 250,
-  ) {
+  constructor(col: number, row: number, kind: TowerKind) {
     super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2 + GRID_OFFSET_Y);
-    this.range       = range;
-    this.fireRate    = fireRate;
-    this.cost        = cost;
-    this.damage      = damage;
-    this.bulletSpeed = bulletSpeed;
+    const def = TOWER_DEFS[kind];
+    if (!def) throw new Error(`Unknown tower kind: "${kind}". Add it to TOWER_DEFS.`);
+    this.range       = def.range;
+    this.fireRate    = def.fireRate;
+    this.cost        = def.cost;
+    this.damage      = def.damage;
+    this.bulletSpeed = def.bulletSpeed;
   }
 
   update(
@@ -77,7 +72,7 @@ export class Tower extends GameObject {
 
 export class OctopusTower extends Tower {
   constructor(col: number, row: number) {
-    super(col, row);
+    super(col, row, TowerKind.Octopus);
   }
 
   override draw(renderer: Renderer): void {
@@ -86,7 +81,6 @@ export class OctopusTower extends Tower {
     const cy     = this.position.y;
     const active = this.currentTarget !== null;
 
-    // Range aura
     renderer.drawCircle(
       this.position,
       this.range,
@@ -96,17 +90,16 @@ export class OctopusTower extends Tower {
     );
 
     const bodyR = 12;
-    const bodyY = cy - 3; // body center slightly above tile centre
+    const bodyY = cy - 3;
 
-    // ── Tentacles (drawn behind body) ────────────────────────────────────────
     ctx.strokeStyle = '#6c3483';
     ctx.lineWidth   = 3;
     ctx.lineCap     = 'round';
 
     const tCount = 6;
     for (let i = 0; i < tCount; i++) {
-      const t      = i / (tCount - 1);              // 0 → 1
-      const sx     = cx + (t - 0.5) * bodyR * 1.7;  // spread across body base
+      const t      = i / (tCount - 1);
+      const sx     = cx + (t - 0.5) * bodyR * 1.7;
       const sy     = bodyY + bodyR * 0.75;
       const spread = (t - 0.5) * 10;
       const ex     = sx + spread;
@@ -117,14 +110,12 @@ export class OctopusTower extends Tower {
       ctx.quadraticCurveTo(sx + spread * 0.5, sy + 7, ex, ey);
       ctx.stroke();
 
-      // Curl at tip
       ctx.beginPath();
       ctx.arc(ex, ey, 2, 0, Math.PI * 2);
       ctx.fillStyle = '#6c3483';
       ctx.fill();
     }
 
-    // ── Body ──────────────────────────────────────────────────────────────────
     ctx.beginPath();
     ctx.arc(cx, bodyY, bodyR, 0, Math.PI * 2);
     ctx.fillStyle = '#9b59b6';
@@ -133,20 +124,16 @@ export class OctopusTower extends Tower {
     ctx.lineWidth   = 2;
     ctx.stroke();
 
-    // Highlight
     ctx.beginPath();
     ctx.arc(cx - bodyR * 0.3, bodyY - bodyR * 0.3, bodyR * 0.38, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
     ctx.fill();
 
-    // ── Eyes ──────────────────────────────────────────────────────────────────
     for (const [ox, oy] of [[-4, -2], [4, -2]] as [number, number][]) {
-      // Sclera
       ctx.beginPath();
       ctx.arc(cx + ox, bodyY + oy, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
       ctx.fill();
-      // Pupil
       ctx.beginPath();
       ctx.arc(cx + ox + 0.8, bodyY + oy + 0.5, 2, 0, Math.PI * 2);
       ctx.fillStyle = '#1a1a1a';
@@ -161,14 +148,13 @@ export class CrabTower extends Tower {
   private readonly patrolCols: number[];
   private patrolIndex: number;
   private movingRight = true;
-  private attackFlash = 0; // seconds remaining for claw-snap animation
+  private attackFlash = 0;
 
-  private static readonly MOVE_SPEED  = 60;  // px/s
-  private static readonly FLASH_TIME  = 0.12; // seconds for claw-snap visual
+  private static readonly MOVE_SPEED  = 60;
+  private static readonly FLASH_TIME  = 0.12;
 
   constructor(col: number, row: number, patrolCols: number[]) {
-    // range=45, fireRate=2.0, cost=1, damage=60, bulletSpeed=0 (直接攻撃)
-    super(col, row, 45, 2.0, 1, 60, 0);
+    super(col, row, TowerKind.Crab);
     this.patrolCols  = patrolCols.length > 0 ? patrolCols : [col];
     this.patrolIndex = Math.max(0, this.patrolCols.indexOf(col));
   }
@@ -178,7 +164,6 @@ export class CrabTower extends Tower {
     enemies: Enemy[],
     _pool: ObjectPool<Bullet> | null,
   ): void {
-    // ── 1. 横方向の巡回移動 ────────────────────────────────────────────────────
     if (this.patrolCols.length > 1) {
       const targetX = this.patrolCols[this.patrolIndex] * TILE_SIZE + TILE_SIZE / 2;
       const dx   = targetX - this.position.x;
@@ -209,7 +194,6 @@ export class CrabTower extends Tower {
       }
     }
 
-    // ── 2. 射程内の敵に直接ダメージ ────────────────────────────────────────────
     if (this.cooldown > 0) {
       this.cooldown = Math.max(0, this.cooldown - deltaTime);
     }
@@ -244,13 +228,11 @@ export class CrabTower extends Tower {
     const cy  = this.position.y;
     const snapping = this.attackFlash > 0;
 
-    // Range aura
     renderer.drawCircle(
       this.position, this.range, 'rgba(0,0,0,0)',
       snapping ? 'rgba(230,126,34,0.30)' : 'rgba(230,126,34,0.10)', 1,
     );
 
-    // Legs (3 pairs, behind body)
     ctx.strokeStyle = '#a04000';
     ctx.lineWidth   = 2;
     ctx.lineCap     = 'round';
@@ -267,7 +249,6 @@ export class CrabTower extends Tower {
       ctx.stroke();
     }
 
-    // Body
     ctx.beginPath();
     ctx.ellipse(cx, cy, 13, 9, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#e67e22';
@@ -276,14 +257,12 @@ export class CrabTower extends Tower {
     ctx.lineWidth   = 2;
     ctx.stroke();
 
-    // Carapace highlight
     ctx.beginPath();
     ctx.ellipse(cx, cy - 2, 8, 4, 0, -Math.PI * 0.3, Math.PI * 0.3);
     ctx.strokeStyle = 'rgba(255,200,100,0.40)';
     ctx.lineWidth   = 2;
     ctx.stroke();
 
-    // Eyes on stalks
     for (const ox of [-5, 5] as const) {
       ctx.beginPath();
       ctx.strokeStyle = '#a04000';
@@ -301,7 +280,6 @@ export class CrabTower extends Tower {
       ctx.fill();
     }
 
-    // Claws (left and right)
     const clawGap = snapping ? 3 : 9;
     for (const side of [-1, 1] as const) {
       const armX = cx + side * 20;
@@ -311,19 +289,16 @@ export class CrabTower extends Tower {
       ctx.lineWidth   = 3;
       ctx.lineCap     = 'round';
 
-      // Arm
       ctx.beginPath();
       ctx.moveTo(cx + side * 10, cy);
       ctx.lineTo(armX, armY);
       ctx.stroke();
 
-      // Upper jaw
       ctx.beginPath();
       ctx.moveTo(armX, armY);
       ctx.lineTo(armX + side * 9, armY - clawGap);
       ctx.stroke();
 
-      // Lower jaw
       ctx.beginPath();
       ctx.moveTo(armX, armY);
       ctx.lineTo(armX + side * 9, armY + clawGap);
@@ -341,13 +316,12 @@ export class HermitCrabTower extends Tower {
   private stateTimer  = 0;
   private attackTimer = 0;
 
-  private static readonly EMERGE_TIME  = 0.4;  // s
-  private static readonly ATTACK_TIME  = 0.8;  // s
-  private static readonly RETREAT_TIME = 0.6;  // s
+  private static readonly EMERGE_TIME  = 0.4;
+  private static readonly ATTACK_TIME  = 0.8;
+  private static readonly RETREAT_TIME = 0.6;
 
   constructor(col: number, row: number) {
-    // range=70, fireRate=1.5, cost=1, damage=45, bulletSpeed=0
-    super(col, row, 70, 1.5, 1, 45, 0);
+    super(col, row, TowerKind.HermitCrab);
   }
 
   override update(
@@ -416,7 +390,6 @@ export class HermitCrabTower extends Tower {
     return nearest;
   }
 
-  /** 0 = 完全に貝殻 / 1 = 完全に出現 */
   get emergeProgress(): number {
     switch (this.hcState) {
       case 'hidden':     return 0;
@@ -434,13 +407,11 @@ export class HermitCrabTower extends Tower {
     const cy   = this.position.y;
     const prog = this.emergeProgress;
 
-    // Range aura
     renderer.drawCircle(
       this.position, this.range, 'rgba(0,0,0,0)',
       prog > 0 ? 'rgba(142,107,34,0.25)' : 'rgba(142,107,34,0.08)', 1,
     );
 
-    // ── Shell (fades slightly as crab emerges) ────────────────────────────────
     ctx.save();
     ctx.globalAlpha *= (1 - prog * 0.6);
     ctx.beginPath();
@@ -452,7 +423,6 @@ export class HermitCrabTower extends Tower {
     ctx.strokeStyle = '#5a3a10';
     ctx.lineWidth   = 1.5;
     ctx.stroke();
-    // Spiral detail
     ctx.beginPath();
     ctx.arc(cx + 2, cy - 2, 4.5, 0.2, Math.PI * 1.6);
     ctx.strokeStyle = '#5a3a10';
@@ -460,14 +430,12 @@ export class HermitCrabTower extends Tower {
     ctx.stroke();
     ctx.restore();
 
-    // ── Crab body (emerges from below) ────────────────────────────────────────
     if (prog > 0.05) {
       const emergeY = cy + 10 - prog * 18;
 
       ctx.save();
       ctx.globalAlpha *= prog;
 
-      // Legs
       ctx.strokeStyle = '#a04000';
       ctx.lineWidth   = 1.5;
       ctx.lineCap     = 'round';
@@ -483,7 +451,6 @@ export class HermitCrabTower extends Tower {
         ctx.stroke();
       }
 
-      // Body
       ctx.beginPath();
       ctx.ellipse(cx, emergeY, 10, 7, 0, 0, Math.PI * 2);
       ctx.fillStyle   = '#e67e22';
@@ -492,7 +459,6 @@ export class HermitCrabTower extends Tower {
       ctx.lineWidth   = 1.5;
       ctx.stroke();
 
-      // Eyes
       for (const ox of [-4, 4] as const) {
         ctx.beginPath();
         ctx.arc(cx + ox, emergeY - 5, 2.5, 0, Math.PI * 2);
@@ -504,7 +470,6 @@ export class HermitCrabTower extends Tower {
         ctx.fill();
       }
 
-      // Claws (fully visible in attacking state)
       if (prog >= 0.8 && this.hcState === 'attacking') {
         const snapping = this.target !== null;
         const clawGap  = snapping ? 3 : 8;
@@ -545,13 +510,12 @@ export class EelTower extends Tower {
   private stretchDir:      Vector2D      = Vector2D.zero();
   private stretchMaxDist   = 0;
 
-  private static readonly STRETCH_TIME = 0.5;  // s
-  private static readonly BITE_TIME    = 0.2;  // s
-  private static readonly RETRACT_TIME = 0.4;  // s
+  private static readonly STRETCH_TIME = 0.5;
+  private static readonly BITE_TIME    = 0.2;
+  private static readonly RETRACT_TIME = 0.4;
 
   constructor(col: number, row: number) {
-    // range=200, fireRate=0.4, cost=1, damage=45, bulletSpeed=0
-    super(col, row, 200, 0.4, 1, 45, 0);
+    super(col, row, TowerKind.Eel);
   }
 
   override update(
@@ -690,7 +654,7 @@ export class EelTower extends Tower {
     ctx.rotate(headAngle);
     ctx.beginPath();
     ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
-    ctx.fillStyle   = state === 'biting' ? '#6f4d3e' : '#6f4d3e';
+    ctx.fillStyle   = '#6f4d3e';
     ctx.fill();
     ctx.strokeStyle = '#4b2d16';
     ctx.lineWidth   = 1;
@@ -700,7 +664,7 @@ export class EelTower extends Tower {
     ctx.lineTo(13, 0);
     ctx.lineTo(8, 4);
     ctx.closePath();
-    ctx.fillStyle = state === 'biting' ? '#6f4d3e' : '#6f4d3e';
+    ctx.fillStyle = '#6f4d3e';
     ctx.fill();
     ctx.beginPath();
     ctx.arc(-2, -3, 2.5, 0, Math.PI * 2);
@@ -727,7 +691,6 @@ export function createTower(
       return new OctopusTower(col, row);
 
     case TowerKind.Crab: {
-      // 配置 col から左右に連続する PATH タイルを収集して巡回範囲を決定
       const patrolCols: number[] = [];
       if (mapGrid) {
         let left  = col;
@@ -748,8 +711,4 @@ export function createTower(
     case TowerKind.Eel:
       return new EelTower(col, row);
   }
-}
-
-export function towerCost(): number {
-  return 1;
 }

@@ -1,10 +1,9 @@
 import { GameObject } from './GameObject.ts';
 import { Renderer } from '../core/Renderer.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
-import { ENEMY_DEFS } from '../defs/enemyDefs.ts';
+import { ENEMY_DEFS, EnemyKind } from '../defs/enemyDefs.ts';
 
-/** 敵の種別 ID（ENEMY_DEFS のキーに対応する文字列）。*/
-export type EnemyKind = string;
+export type { EnemyKind };
 
 export const EATING_INTERVAL = 1.0; // seconds between egg consumption at goal
 

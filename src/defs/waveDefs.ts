@@ -1,6 +1,8 @@
+import type { EnemyKind } from './enemyDefs.ts';
+
 export interface SpawnEntry {
   /** ENEMY_DEFS のキー（例: 'small', 'medium', 'boss'）*/
-  enemyId: string;
+  enemyId: EnemyKind;
   spawnIdx: number;
   /** 次のエントリまでの待機秒数。省略時は SPAWN_INTERVAL を使用 */
   delay?: number;
@@ -32,7 +34,7 @@ export const WAVE_DEFS: WaveDef[] = [
       { enemyId: 'small', spawnIdx: 0 },
     ],
   },
-  // Wave 2 — small ×7 (spawnIdx 0)、medium ×4 (spawnIdx 1)
+  // Wave 2 — small ×8 (spawnIdx 0)、medium ×3 (spawnIdx 1)
   {
     timeBonusTargetSec: 60,
     spawns: [
@@ -49,7 +51,7 @@ export const WAVE_DEFS: WaveDef[] = [
       { enemyId: 'small',  spawnIdx: 0 },
     ],
   },
-  // Wave 3 — small ×6 (spawnIdx 0,2)、medium ×10 (spawnIdx 0,1,2)
+  // Wave 3 — small ×7 (spawnIdx 0,2)、medium ×9 (spawnIdx 0,1,2)
   {
     timeBonusTargetSec: 90,
     spawns: [
@@ -71,7 +73,7 @@ export const WAVE_DEFS: WaveDef[] = [
       { enemyId: 'medium', spawnIdx: 2 },
     ],
   },
-  // Wave 4 — small ×6、medium ×12、boss ×1、spawnIdx round-robin 0–4
+  // Wave 4 — small ×7、medium ×12、boss ×1、spawnIdx round-robin 0–4
   {
     timeBonusTargetSec: 120,
     spawns: [

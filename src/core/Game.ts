@@ -1,7 +1,7 @@
 import { Renderer } from './Renderer.ts';
 import { WaveManager } from './WaveManager.ts';
 import { ScoreManager } from './ScoreManager.ts';
-import { InputHandler } from './InputHandler.ts';
+import { InputHandler, HOLD_DURATION } from './InputHandler.ts';
 import { MapGrid, GOAL_COLS, GOAL_ROW, INITIAL_GOAL_IDX, TILE_SIZE } from '../level/MapGrid.ts';
 import { PlacementSpot } from '../defs/mapDefs.ts';
 import { CoralWall } from '../entities/CoralWall.ts';
@@ -611,7 +611,7 @@ export class Game {
 
     const ctx      = this.renderer.context;
     const center   = this.mapGrid.spotCenter(spot.col, spot.row);
-    const progress = Math.min(this.inputHandler.holdTimer / 2.0, 1); // HOLD_DURATION = 2.0
+    const progress = Math.min(this.inputHandler.holdTimer / HOLD_DURATION, 1);
 
     ctx.save();
     ctx.globalAlpha = 0.25 + progress * 0.30;

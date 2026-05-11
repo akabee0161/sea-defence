@@ -31,7 +31,9 @@ export class ScoreManager {
   finalizeWave(waveNumber: number, currentHp: number): WaveScoreDetails {
     const enemyScore       = this._waveEnemiesDefeated * 100;
     const eggScore         = currentHp * 50;
-    const elapsedMs        = performance.now() - this._waveStartTime;
+    const elapsedMs        = this._waveStartTime > 0
+      ? performance.now() - this._waveStartTime
+      : 0;
     const timeBonus        = this.calcTimeBonus(waveNumber, elapsedMs);
     const total            = enemyScore + eggScore + timeBonus;
     const crackedEggsEarned = currentHp;
@@ -42,7 +44,7 @@ export class ScoreManager {
   }
 
   private calcTimeBonus(waveNumber: number, elapsedMs: number): number {
-    const idx    = Math.min(waveNumber - 1, WAVE_DEFS.length - 1);
+    const idx    = Math.min(Math.max(0, waveNumber - 1), WAVE_DEFS.length - 1);
     const target = WAVE_DEFS[idx]?.timeBonusTargetSec ?? 90;
     const sec    = elapsedMs / 1000;
     if (sec <= target)      return 500;

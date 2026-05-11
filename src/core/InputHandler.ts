@@ -3,7 +3,7 @@ import { PlacementSpot } from '../defs/mapDefs.ts';
 import { MapGrid, TILE_SIZE } from '../level/MapGrid.ts';
 import { Renderer } from './Renderer.ts';
 
-const HOLD_DURATION         = 2.0; // seconds to hold pointer before placing
+export const HOLD_DURATION  = 2.0; // seconds to hold pointer before placing
 const DRAG_CANCEL_THRESHOLD = 8;   // px — slide past this to cancel hold and drag instead
 
 export interface InputCallbacks {
@@ -79,6 +79,9 @@ export class InputHandler {
   }
 
   reset(): void {
+    if (this.dragPointerId !== null) {
+      try { this.canvas.releasePointerCapture(this.dragPointerId); } catch { /* already released */ }
+    }
     this.holdSpot      = null;
     this.holdTimer     = 0;
     this.dragPointerId = null;
@@ -97,8 +100,8 @@ export class InputHandler {
 
   private pointerToCanvas(e: PointerEvent): Vector2D {
     const rect   = this.canvas.getBoundingClientRect();
-    const scaleX = this.renderer.width  / rect.width;
-    const scaleY = this.renderer.height / rect.height;
+    const scaleX = this.renderer.width  / (rect.width  || 1);
+    const scaleY = this.renderer.height / (rect.height || 1);
     return new Vector2D(
       (e.clientX - rect.left) * scaleX,
       (e.clientY - rect.top)  * scaleY,
@@ -173,10 +176,10 @@ export class InputHandler {
   private onUp = (e?: PointerEvent): void => {
     if (e && this.dragPointerId === e.pointerId) {
       this.canvas.releasePointerCapture?.(e.pointerId);
-      this.dragPointerId = null;
-      this.dragStart     = null;
     }
-    this.holdSpot  = null;
-    this.holdTimer = 0;
+    this.dragPointerId = null;
+    this.dragStart     = null;
+    this.holdSpot      = null;
+    this.holdTimer     = 0;
   };
 }

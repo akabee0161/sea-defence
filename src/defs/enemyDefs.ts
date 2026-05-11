@@ -12,7 +12,7 @@ export interface EnemyDef {
  * 敵の種類定義。
  * 新たな敵を追加するには、このオブジェクトにエントリを追加するだけでよい。
  */
-export const ENEMY_DEFS: Record<string, EnemyDef> = {
+export const ENEMY_DEFS = {
   small: {
     id: 'small',
     radius: 11,
@@ -27,7 +27,7 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     radius: 17,
     speed: 120,
     maxHp: 320,
-    reward: 1,
+    reward: 4,
     bodyColor: '#f4d03f',
     finColor: '#b7950b',
   },
@@ -36,8 +36,10 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     radius: 30,
     speed: 80,
     maxHp: 1200,
-    reward: 1,
+    reward: 15,
     bodyColor: '#e74c3c',
     finColor: '#922b21',
   },
-};
+} satisfies Record<string, EnemyDef>;
+
+export type EnemyKind = keyof typeof ENEMY_DEFS;

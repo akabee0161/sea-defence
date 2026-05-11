@@ -1,6 +1,7 @@
 import { Vector2D } from '../utils/Vector2D.ts';
 import { Renderer } from '../core/Renderer.ts';
 import { MAP_DEF } from '../defs/mapDefs.ts';
+import type { PlacementSpot } from '../defs/mapDefs.ts';
 
 // ── 型・定数の再エクスポート（他ファイルの既存 import を維持するため）──────────
 export type { SpotKind, PlacementSpot } from '../defs/mapDefs.ts';
@@ -86,7 +87,11 @@ export class MapGrid {
     return this.tiles[row][col];
   }
 
-  get allSpots(): typeof MAP_DEF.placementSpots { return MAP_DEF.placementSpots; }
+  get allSpots(): readonly PlacementSpot[] { return MAP_DEF.placementSpots as readonly PlacementSpot[]; }
+
+  getSpot(col: number, row: number): PlacementSpot | undefined {
+    return MAP_DEF.placementSpots.find(s => s.col === col && s.row === row);
+  }
 
   /** Spawn cell (col, row) for each path, indexed by spawnIdx (= pathIdx). */
   get spawnCells(): ReadonlyArray<{ readonly col: number; readonly row: number }> {

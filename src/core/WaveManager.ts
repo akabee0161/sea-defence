@@ -17,6 +17,7 @@ export class WaveManager {
   private queueIndex = 0;
   private spawnTimer = 0;
   private phase: 'interval' | 'wave' | 'clear' = 'interval';
+  private allEnemiesSpawnedTimestamp: number | null = null;
 
   private readonly onSpawn:     SpawnCallback;
   private readonly onWaveClear: WaveClearCallback | null;
@@ -50,12 +51,17 @@ export class WaveManager {
         this.onSpawn(entry.enemyId, entry.spawnIdx);
         this.queueIndex++;
       }
-    } else if (activeEnemyCount === 0) {
-      this.onWaveClear?.(this.waveNumber);
-      if (this.waveNumber >= TOTAL_WAVES) {
-        this.phase = 'clear';
-      } else {
-        this.phase = 'interval';
+    } else {
+      if (this.allEnemiesSpawnedTimestamp === null) {
+        this.allEnemiesSpawnedTimestamp = performance.now();
+      }
+      if (activeEnemyCount === 0) {
+        this.onWaveClear?.(this.waveNumber);
+        if (this.waveNumber >= TOTAL_WAVES) {
+          this.phase = 'clear';
+        } else {
+          this.phase = 'interval';
+        }
       }
     }
   }
@@ -71,6 +77,10 @@ export class WaveManager {
     this.queueIndex = 0;
     this.spawnTimer = 0;
     this.phase      = 'wave';
+  }
+
+  getAllEnemiesSpawnedTimestamp(): number | null {
+    return this.allEnemiesSpawnedTimestamp;
   }
 
   // ── Public queries ─────────────────────────────────────────────────────────
@@ -112,9 +122,10 @@ export class WaveManager {
   }
 
   reset(): void {
-    this.waveNumber = 0;
-    this.queueIndex = 0;
-    this.spawnTimer = 0;
-    this.phase      = 'interval';
+    this.waveNumber              = 0;
+    this.queueIndex              = 0;
+    this.spawnTimer              = 0;
+    this.phase                   = 'interval';
+    this.allEnemiesSpawnedTimestamp = null;
   }
 }

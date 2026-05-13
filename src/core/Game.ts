@@ -378,7 +378,8 @@ export class Game {
   }
 
   private onWaveClear(waveNumber: number): void {
-    const details = this.scoreManager.finalizeWave(waveNumber, this.playerHp);
+    const spawnCompletedAt = this.waveManager.getAllEnemiesSpawnedTimestamp();
+    const details = this.scoreManager.finalizeWave(waveNumber, this.playerHp, spawnCompletedAt);
     this.lastWaveScoreDetails = details;
 
     this.crackedEggs += details.crackedEggsEarned;

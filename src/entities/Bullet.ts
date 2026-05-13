@@ -1,7 +1,7 @@
-import { GameObject } from './GameObject.ts';
-import { Enemy } from './Enemy.ts';
-import { Renderer } from '../core/Renderer.ts';
+import type { Renderer } from '../core/Renderer.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
+import type { Enemy } from './Enemy.ts';
+import { GameObject } from './GameObject.ts';
 
 const BULLET_RADIUS = 5;
 
@@ -37,7 +37,7 @@ export class Bullet extends GameObject {
 
     const step = this.speed * deltaTime;
 
-    if (this.target !== null && this.target.isActive) {
+    if (this.target?.isActive) {
       // Home in on live target
       const toTarget = this.target.pos.subtract(this.position);
       this.direction = toTarget.normalize();

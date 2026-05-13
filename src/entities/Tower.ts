@@ -1,37 +1,41 @@
-import { GameObject } from './GameObject.ts';
-import { Enemy } from './Enemy.ts';
-import { Bullet } from './Bullet.ts';
-import { ObjectPool } from '../utils/ObjectPool.ts';
-import { Renderer } from '../core/Renderer.ts';
-import { TILE_SIZE, GRID_OFFSET_Y, MapGrid } from '../level/MapGrid.ts';
-import { Vector2D } from '../utils/Vector2D.ts';
+import type { Renderer } from '../core/Renderer.ts';
 import { TOWER_DEFS } from '../defs/towerDefs.ts';
+import { GRID_OFFSET_Y, type MapGrid, TILE_SIZE } from '../level/MapGrid.ts';
+import type { ObjectPool } from '../utils/ObjectPool.ts';
+import { Vector2D } from '../utils/Vector2D.ts';
+import type { Bullet } from './Bullet.ts';
+import type { Enemy } from './Enemy.ts';
+import { GameObject } from './GameObject.ts';
 
 export enum TowerKind {
-  Octopus    = 'octopus',
-  Crab       = 'crab',
+  Octopus = 'octopus',
+  Crab = 'crab',
   HermitCrab = 'hermit_crab',
-  Eel        = 'eel',
+  Eel = 'eel',
 }
 
 export class Tower extends GameObject {
-  readonly range:       number;
-  readonly fireRate:    number;
-  readonly cost:        number;
-  readonly damage:      number;
+  readonly range: number;
+  readonly fireRate: number;
+  readonly cost: number;
+  readonly damage: number;
   readonly bulletSpeed: number;
 
   protected cooldown = 0;
   protected target: Enemy | null = null;
 
   constructor(col: number, row: number, kind: TowerKind) {
-    super(col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2 + GRID_OFFSET_Y);
+    super(
+      col * TILE_SIZE + TILE_SIZE / 2,
+      row * TILE_SIZE + TILE_SIZE / 2 + GRID_OFFSET_Y,
+    );
     const def = TOWER_DEFS[kind];
-    if (!def) throw new Error(`Unknown tower kind: "${kind}". Add it to TOWER_DEFS.`);
-    this.range       = def.range;
-    this.fireRate    = def.fireRate;
-    this.cost        = def.cost;
-    this.damage      = def.damage;
+    if (!def)
+      throw new Error(`Unknown tower kind: "${kind}". Add it to TOWER_DEFS.`);
+    this.range = def.range;
+    this.fireRate = def.fireRate;
+    this.cost = def.cost;
+    this.damage = def.damage;
     this.bulletSpeed = def.bulletSpeed;
   }
 
@@ -62,10 +66,16 @@ export class Tower extends GameObject {
     }
   }
 
-  draw(_renderer: Renderer): void { /* overridden by subclass */ }
+  draw(_renderer: Renderer): void {
+    /* overridden by subclass */
+  }
 
-  get canFire(): boolean { return this.cooldown <= 0; }
-  get currentTarget(): Enemy | null { return this.target; }
+  get canFire(): boolean {
+    return this.cooldown <= 0;
+  }
+  get currentTarget(): Enemy | null {
+    return this.target;
+  }
 }
 
 // ── Octopus Tower ─────────────────────────────────────────────────────────────
@@ -76,9 +86,9 @@ export class OctopusTower extends Tower {
   }
 
   override draw(renderer: Renderer): void {
-    const ctx    = renderer.context;
-    const cx     = this.position.x;
-    const cy     = this.position.y;
+    const ctx = renderer.context;
+    const cx = this.position.x;
+    const cy = this.position.y;
     const active = this.currentTarget !== null;
 
     renderer.drawCircle(
@@ -93,17 +103,17 @@ export class OctopusTower extends Tower {
     const bodyY = cy - 3;
 
     ctx.strokeStyle = '#6c3483';
-    ctx.lineWidth   = 3;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
 
     const tCount = 6;
     for (let i = 0; i < tCount; i++) {
-      const t      = i / (tCount - 1);
-      const sx     = cx + (t - 0.5) * bodyR * 1.7;
-      const sy     = bodyY + bodyR * 0.75;
+      const t = i / (tCount - 1);
+      const sx = cx + (t - 0.5) * bodyR * 1.7;
+      const sy = bodyY + bodyR * 0.75;
       const spread = (t - 0.5) * 10;
-      const ex     = sx + spread;
-      const ey     = sy + 13;
+      const ex = sx + spread;
+      const ey = sy + 13;
 
       ctx.beginPath();
       ctx.moveTo(sx, sy);
@@ -121,15 +131,24 @@ export class OctopusTower extends Tower {
     ctx.fillStyle = '#9b59b6';
     ctx.fill();
     ctx.strokeStyle = '#6c3483';
-    ctx.lineWidth   = 2;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.arc(cx - bodyR * 0.3, bodyY - bodyR * 0.3, bodyR * 0.38, 0, Math.PI * 2);
+    ctx.arc(
+      cx - bodyR * 0.3,
+      bodyY - bodyR * 0.3,
+      bodyR * 0.38,
+      0,
+      Math.PI * 2,
+    );
     ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
     ctx.fill();
 
-    for (const [ox, oy] of [[-4, -2], [4, -2]] as [number, number][]) {
+    for (const [ox, oy] of [
+      [-4, -2],
+      [4, -2],
+    ] as [number, number][]) {
       ctx.beginPath();
       ctx.arc(cx + ox, bodyY + oy, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
@@ -150,12 +169,12 @@ export class CrabTower extends Tower {
   private movingRight = true;
   private attackFlash = 0;
 
-  private static readonly MOVE_SPEED  = 60;
-  private static readonly FLASH_TIME  = 0.12;
+  private static readonly MOVE_SPEED = 60;
+  private static readonly FLASH_TIME = 0.12;
 
   constructor(col: number, row: number, patrolCols: number[]) {
     super(col, row, TowerKind.Crab);
-    this.patrolCols  = patrolCols.length > 0 ? patrolCols : [col];
+    this.patrolCols = patrolCols.length > 0 ? patrolCols : [col];
     this.patrolIndex = Math.max(0, this.patrolCols.indexOf(col));
   }
 
@@ -165,8 +184,9 @@ export class CrabTower extends Tower {
     _pool: ObjectPool<Bullet> | null,
   ): void {
     if (this.patrolCols.length > 1) {
-      const targetX = this.patrolCols[this.patrolIndex] * TILE_SIZE + TILE_SIZE / 2;
-      const dx   = targetX - this.position.x;
+      const targetX =
+        this.patrolCols[this.patrolIndex] * TILE_SIZE + TILE_SIZE / 2;
+      const dx = targetX - this.position.x;
       const step = CrabTower.MOVE_SPEED * deltaTime;
 
       if (Math.abs(dx) <= step) {
@@ -183,7 +203,10 @@ export class CrabTower extends Tower {
             this.patrolIndex--;
           } else {
             this.movingRight = true;
-            this.patrolIndex = Math.min(this.patrolCols.length - 1, this.patrolIndex + 1);
+            this.patrolIndex = Math.min(
+              this.patrolCols.length - 1,
+              this.patrolIndex + 1,
+            );
           }
         }
       } else {
@@ -210,32 +233,35 @@ export class CrabTower extends Tower {
         const dist = this.position.distanceTo(enemy.pos);
         if (dist <= this.range && dist < nearestDist) {
           nearestDist = dist;
-          nearest     = enemy;
+          nearest = enemy;
         }
       }
       if (nearest !== null) {
         nearest.takeDamage(this.damage);
-        this.cooldown    = 1 / this.fireRate;
+        this.cooldown = 1 / this.fireRate;
         this.attackFlash = CrabTower.FLASH_TIME;
-        this.target      = nearest;
+        this.target = nearest;
       }
     }
   }
 
   override draw(renderer: Renderer): void {
     const ctx = renderer.context;
-    const cx  = this.position.x;
-    const cy  = this.position.y;
+    const cx = this.position.x;
+    const cy = this.position.y;
     const snapping = this.attackFlash > 0;
 
     renderer.drawCircle(
-      this.position, this.range, 'rgba(0,0,0,0)',
-      snapping ? 'rgba(230,126,34,0.30)' : 'rgba(230,126,34,0.10)', 1,
+      this.position,
+      this.range,
+      'rgba(0,0,0,0)',
+      snapping ? 'rgba(230,126,34,0.30)' : 'rgba(230,126,34,0.10)',
+      1,
     );
 
     ctx.strokeStyle = '#a04000';
-    ctx.lineWidth   = 2;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
     for (let i = 0; i < 3; i++) {
       const ly = cy + 1 + i * 5;
       const lx = 8 + i * 2;
@@ -254,19 +280,19 @@ export class CrabTower extends Tower {
     ctx.fillStyle = '#e67e22';
     ctx.fill();
     ctx.strokeStyle = '#a04000';
-    ctx.lineWidth   = 2;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.ellipse(cx, cy - 2, 8, 4, 0, -Math.PI * 0.3, Math.PI * 0.3);
     ctx.strokeStyle = 'rgba(255,200,100,0.40)';
-    ctx.lineWidth   = 2;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     for (const ox of [-5, 5] as const) {
       ctx.beginPath();
       ctx.strokeStyle = '#a04000';
-      ctx.lineWidth   = 1.5;
+      ctx.lineWidth = 1.5;
       ctx.moveTo(cx + ox, cy - 6);
       ctx.lineTo(cx + ox, cy - 11);
       ctx.stroke();
@@ -286,8 +312,8 @@ export class CrabTower extends Tower {
       const armY = cy - 1;
 
       ctx.strokeStyle = '#a04000';
-      ctx.lineWidth   = 3;
-      ctx.lineCap     = 'round';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
 
       ctx.beginPath();
       ctx.moveTo(cx + side * 10, cy);
@@ -312,12 +338,12 @@ export class CrabTower extends Tower {
 type HermitCrabState = 'hidden' | 'emerging' | 'attacking' | 'retreating';
 
 export class HermitCrabTower extends Tower {
-  private hcState:    HermitCrabState = 'hidden';
-  private stateTimer  = 0;
+  private hcState: HermitCrabState = 'hidden';
+  private stateTimer = 0;
   private attackTimer = 0;
 
-  private static readonly EMERGE_TIME  = 0.4;
-  private static readonly ATTACK_TIME  = 0.8;
+  private static readonly EMERGE_TIME = 0.4;
+  private static readonly ATTACK_TIME = 0.8;
   private static readonly RETREAT_TIME = 0.6;
 
   constructor(col: number, row: number) {
@@ -333,7 +359,7 @@ export class HermitCrabTower extends Tower {
       case 'hidden': {
         const nearby = this.findNearest(enemies);
         if (nearby !== null) {
-          this.hcState    = 'emerging';
+          this.hcState = 'emerging';
           this.stateTimer = 0;
         }
         break;
@@ -341,9 +367,9 @@ export class HermitCrabTower extends Tower {
       case 'emerging': {
         this.stateTimer += deltaTime;
         if (this.stateTimer >= HermitCrabTower.EMERGE_TIME) {
-          this.hcState     = 'attacking';
+          this.hcState = 'attacking';
           this.attackTimer = 0;
-          this.cooldown    = 0;
+          this.cooldown = 0;
         }
         break;
       }
@@ -359,16 +385,16 @@ export class HermitCrabTower extends Tower {
           this.cooldown = 1 / this.fireRate;
         }
         if (this.attackTimer >= HermitCrabTower.ATTACK_TIME) {
-          this.hcState    = 'retreating';
+          this.hcState = 'retreating';
           this.stateTimer = 0;
-          this.target     = null;
+          this.target = null;
         }
         break;
       }
       case 'retreating': {
         this.stateTimer += deltaTime;
         if (this.stateTimer >= HermitCrabTower.RETREAT_TIME) {
-          this.hcState    = 'hidden';
+          this.hcState = 'hidden';
           this.stateTimer = 0;
         }
         break;
@@ -384,7 +410,7 @@ export class HermitCrabTower extends Tower {
       const dist = this.position.distanceTo(enemy.pos);
       if (dist <= this.range && dist < nearestDist) {
         nearestDist = dist;
-        nearest     = enemy;
+        nearest = enemy;
       }
     }
     return nearest;
@@ -392,41 +418,52 @@ export class HermitCrabTower extends Tower {
 
   get emergeProgress(): number {
     switch (this.hcState) {
-      case 'hidden':     return 0;
-      case 'emerging':   return this.stateTimer / HermitCrabTower.EMERGE_TIME;
-      case 'attacking':  return 1;
-      case 'retreating': return 1 - this.stateTimer / HermitCrabTower.RETREAT_TIME;
+      case 'hidden':
+        return 0;
+      case 'emerging':
+        return this.stateTimer / HermitCrabTower.EMERGE_TIME;
+      case 'attacking':
+        return 1;
+      case 'retreating':
+        return 1 - this.stateTimer / HermitCrabTower.RETREAT_TIME;
+      default:
+        return 0;
     }
   }
 
-  get currentHcState(): HermitCrabState { return this.hcState; }
+  get currentHcState(): HermitCrabState {
+    return this.hcState;
+  }
 
   override draw(renderer: Renderer): void {
-    const ctx  = renderer.context;
-    const cx   = this.position.x;
-    const cy   = this.position.y;
+    const ctx = renderer.context;
+    const cx = this.position.x;
+    const cy = this.position.y;
     const prog = this.emergeProgress;
 
     renderer.drawCircle(
-      this.position, this.range, 'rgba(0,0,0,0)',
-      prog > 0 ? 'rgba(142,107,34,0.25)' : 'rgba(142,107,34,0.08)', 1,
+      this.position,
+      this.range,
+      'rgba(0,0,0,0)',
+      prog > 0 ? 'rgba(142,107,34,0.25)' : 'rgba(142,107,34,0.08)',
+      1,
     );
 
     ctx.save();
-    ctx.globalAlpha *= (1 - prog * 0.6);
+    ctx.globalAlpha *= 1 - prog * 0.6;
     ctx.beginPath();
     ctx.moveTo(cx, cy - 14);
-    ctx.bezierCurveTo(cx + 13, cy - 10, cx + 13,  cy + 4, cx, cy + 6);
-    ctx.bezierCurveTo(cx - 13, cy + 4,  cx - 13, cy - 10, cx, cy - 14);
-    ctx.fillStyle   = '#8e6030';
+    ctx.bezierCurveTo(cx + 13, cy - 10, cx + 13, cy + 4, cx, cy + 6);
+    ctx.bezierCurveTo(cx - 13, cy + 4, cx - 13, cy - 10, cx, cy - 14);
+    ctx.fillStyle = '#8e6030';
     ctx.fill();
     ctx.strokeStyle = '#5a3a10';
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(cx + 2, cy - 2, 4.5, 0.2, Math.PI * 1.6);
     ctx.strokeStyle = '#5a3a10';
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
@@ -437,8 +474,8 @@ export class HermitCrabTower extends Tower {
       ctx.globalAlpha *= prog;
 
       ctx.strokeStyle = '#a04000';
-      ctx.lineWidth   = 1.5;
-      ctx.lineCap     = 'round';
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round';
       for (let i = 0; i < 2; i++) {
         const ly = emergeY + i * 4;
         ctx.beginPath();
@@ -453,10 +490,10 @@ export class HermitCrabTower extends Tower {
 
       ctx.beginPath();
       ctx.ellipse(cx, emergeY, 10, 7, 0, 0, Math.PI * 2);
-      ctx.fillStyle   = '#e67e22';
+      ctx.fillStyle = '#e67e22';
       ctx.fill();
       ctx.strokeStyle = '#a04000';
-      ctx.lineWidth   = 1.5;
+      ctx.lineWidth = 1.5;
       ctx.stroke();
 
       for (const ox of [-4, 4] as const) {
@@ -472,12 +509,12 @@ export class HermitCrabTower extends Tower {
 
       if (prog >= 0.8 && this.hcState === 'attacking') {
         const snapping = this.target !== null;
-        const clawGap  = snapping ? 3 : 8;
+        const clawGap = snapping ? 3 : 8;
         for (const side of [-1, 1] as const) {
           const armX = cx + side * 16;
           ctx.strokeStyle = '#a04000';
-          ctx.lineWidth   = 2.5;
-          ctx.lineCap     = 'round';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.moveTo(cx + side * 8, emergeY);
           ctx.lineTo(armX, emergeY - 2);
@@ -503,15 +540,15 @@ export class HermitCrabTower extends Tower {
 type EelState = 'idle' | 'stretching' | 'biting' | 'retracting';
 
 export class EelTower extends Tower {
-  private eelState:        EelState = 'idle';
-  private stretchProgress  = 0;
-  private biteTimer        = 0;
-  private stretchTarget:   Enemy | null  = null;
-  private stretchDir:      Vector2D      = Vector2D.zero();
-  private stretchMaxDist   = 0;
+  private eelState: EelState = 'idle';
+  private stretchProgress = 0;
+  private biteTimer = 0;
+  private stretchTarget: Enemy | null = null;
+  private stretchDir: Vector2D = Vector2D.zero();
+  private stretchMaxDist = 0;
 
   private static readonly STRETCH_TIME = 0.5;
-  private static readonly BITE_TIME    = 0.2;
+  private static readonly BITE_TIME = 0.2;
   private static readonly RETRACT_TIME = 0.4;
 
   constructor(col: number, row: number) {
@@ -532,12 +569,12 @@ export class EelTower extends Tower {
         if (this.cooldown <= 0) {
           const nearest = this.findNearest(enemies);
           if (nearest !== null) {
-            this.stretchTarget   = nearest;
-            const toEnemy        = nearest.pos.subtract(this.position);
-            this.stretchMaxDist  = Math.min(toEnemy.magnitude(), this.range);
-            this.stretchDir      = toEnemy.normalize();
+            this.stretchTarget = nearest;
+            const toEnemy = nearest.pos.subtract(this.position);
+            this.stretchMaxDist = Math.min(toEnemy.magnitude(), this.range);
+            this.stretchDir = toEnemy.normalize();
             this.stretchProgress = 0;
-            this.eelState        = 'stretching';
+            this.eelState = 'stretching';
           }
         }
         break;
@@ -548,9 +585,9 @@ export class EelTower extends Tower {
           this.stretchProgress + deltaTime / EelTower.STRETCH_TIME,
         );
         if (this.stretchProgress >= 1) {
-          this.eelState  = 'biting';
+          this.eelState = 'biting';
           this.biteTimer = 0;
-          if (this.stretchTarget !== null && this.stretchTarget.isActive) {
+          if (this.stretchTarget?.isActive) {
             this.stretchTarget.takeDamage(this.damage);
           }
         }
@@ -569,8 +606,8 @@ export class EelTower extends Tower {
           this.stretchProgress - deltaTime / EelTower.RETRACT_TIME,
         );
         if (this.stretchProgress <= 0) {
-          this.eelState      = 'idle';
-          this.cooldown      = 1 / this.fireRate;
+          this.eelState = 'idle';
+          this.cooldown = 1 / this.fireRate;
           this.stretchTarget = null;
         }
         break;
@@ -586,7 +623,7 @@ export class EelTower extends Tower {
       const dist = this.position.distanceTo(enemy.pos);
       if (dist <= this.range && dist < nearestDist) {
         nearestDist = dist;
-        nearest     = enemy;
+        nearest = enemy;
       }
     }
     return nearest;
@@ -598,49 +635,54 @@ export class EelTower extends Tower {
     );
   }
 
-  get currentEelState(): EelState { return this.eelState; }
+  get currentEelState(): EelState {
+    return this.eelState;
+  }
 
   override draw(renderer: Renderer): void {
-    const ctx   = renderer.context;
-    const cx    = this.position.x;
-    const cy    = this.position.y;
+    const ctx = renderer.context;
+    const cx = this.position.x;
+    const cy = this.position.y;
     const state = this.eelState;
 
     renderer.drawCircle(
-      this.position, this.range, 'rgba(0,0,0,0)',
-      state !== 'idle' ? 'rgba(39,174,96,0.25)' : 'rgba(39,174,96,0.08)', 1,
+      this.position,
+      this.range,
+      'rgba(0,0,0,0)',
+      state !== 'idle' ? 'rgba(39,174,96,0.25)' : 'rgba(39,174,96,0.08)',
+      1,
     );
 
     if (state === 'idle') {
       ctx.beginPath();
       ctx.moveTo(cx, cy + 10);
-      ctx.bezierCurveTo(cx + 13, cy + 4,  cx - 13, cy,      cx,      cy - 5);
-      ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8,  cy - 18, cx,      cy - 18);
+      ctx.bezierCurveTo(cx + 13, cy + 4, cx - 13, cy, cx, cy - 5);
+      ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8, cy - 18, cx, cy - 18);
       ctx.strokeStyle = '#8f6446';
-      ctx.lineWidth   = 6;
-      ctx.lineCap     = 'round';
+      ctx.lineWidth = 6;
+      ctx.lineCap = 'round';
       ctx.stroke();
       ctx.beginPath();
       ctx.ellipse(cx, cy - 18, 6, 4, 0, 0, Math.PI * 2);
-      ctx.fillStyle   = '#6f4d3e';
+      ctx.fillStyle = '#6f4d3e';
       ctx.fill();
       ctx.strokeStyle = '#4b2d16';
-      ctx.lineWidth   = 1;
+      ctx.lineWidth = 1;
       ctx.stroke();
       return;
     }
 
-    const head  = this.headPos;
-    const perp  = new Vector2D(-this.stretchDir.y, this.stretchDir.x);
-    const midX  = cx + (head.x - cx) * 0.5 + perp.x * 12 * this.stretchProgress;
-    const midY  = cy + (head.y - cy) * 0.5 + perp.y * 12 * this.stretchProgress;
+    const head = this.headPos;
+    const perp = new Vector2D(-this.stretchDir.y, this.stretchDir.x);
+    const midX = cx + (head.x - cx) * 0.5 + perp.x * 12 * this.stretchProgress;
+    const midY = cy + (head.y - cy) * 0.5 + perp.y * 12 * this.stretchProgress;
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.quadraticCurveTo(midX, midY, head.x, head.y);
     ctx.strokeStyle = '#8f6446';
-    ctx.lineWidth   = 6;
-    ctx.lineCap     = 'round';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
     ctx.stroke();
 
     ctx.beginPath();
@@ -654,10 +696,10 @@ export class EelTower extends Tower {
     ctx.rotate(headAngle);
     ctx.beginPath();
     ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
-    ctx.fillStyle   = '#6f4d3e';
+    ctx.fillStyle = '#6f4d3e';
     ctx.fill();
     ctx.strokeStyle = '#4b2d16';
-    ctx.lineWidth   = 1;
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(8, -4);
@@ -681,9 +723,9 @@ export class EelTower extends Tower {
 // ── Factory ───────────────────────────────────────────────────────────────────
 
 export function createTower(
-  kind:     TowerKind,
-  col:      number,
-  row:      number,
+  kind: TowerKind,
+  col: number,
+  row: number,
   mapGrid?: MapGrid,
 ): Tower {
   switch (kind) {
@@ -693,10 +735,11 @@ export function createTower(
     case TowerKind.Crab: {
       const patrolCols: number[] = [];
       if (mapGrid) {
-        let left  = col;
+        let left = col;
         let right = col;
-        while (left  > 0                && mapGrid.isPathTile(left  - 1, row)) left--;
-        while (right < mapGrid.cols - 1 && mapGrid.isPathTile(right + 1, row)) right++;
+        while (left > 0 && mapGrid.isPathTile(left - 1, row)) left--;
+        while (right < mapGrid.cols - 1 && mapGrid.isPathTile(right + 1, row))
+          right++;
         for (let c = left; c <= right; c++) {
           if (mapGrid.isPathTile(c, row)) patrolCols.push(c);
         }

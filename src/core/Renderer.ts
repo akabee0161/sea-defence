@@ -1,4 +1,4 @@
-import { Vector2D } from '../utils/Vector2D.ts';
+import type { Vector2D } from '../utils/Vector2D.ts';
 
 export class Renderer {
   private ctx: CanvasRenderingContext2D;

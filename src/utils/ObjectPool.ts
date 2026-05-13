@@ -22,7 +22,7 @@ export class ObjectPool<T extends Poolable> {
    * If none are available, create a new one via the factory and add it.
    */
   acquire(): T {
-    const reuse = this.pool.find(o => !o.isActive);
+    const reuse = this.pool.find((o) => !o.isActive);
     if (reuse !== undefined) return reuse;
 
     const fresh = this.factory();

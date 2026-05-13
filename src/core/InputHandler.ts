@@ -1,10 +1,10 @@
+import type { PlacementSpot } from '../defs/mapDefs.ts';
+import { type MapGrid, TILE_SIZE } from '../level/MapGrid.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
-import { PlacementSpot } from '../defs/mapDefs.ts';
-import { MapGrid, TILE_SIZE } from '../level/MapGrid.ts';
-import { Renderer } from './Renderer.ts';
+import type { Renderer } from './Renderer.ts';
 
-export const HOLD_DURATION  = 2.0; // seconds to hold pointer before placing
-const DRAG_CANCEL_THRESHOLD = 8;   // px — slide past this to cancel hold and drag instead
+export const HOLD_DURATION = 2.0; // seconds to hold pointer before placing
+const DRAG_CANCEL_THRESHOLD = 8; // px — slide past this to cancel hold and drag instead
 
 export interface InputCallbacks {
   /** 現在プレビュー中の建設スポット（なければ null）*/
@@ -32,16 +32,16 @@ export interface InputCallbacks {
 
 export class InputHandler {
   /** ホールド中のスポット（Game が参照して描画プレビューに使う）*/
-  holdSpot:  PlacementSpot | null = null;
-  holdTimer  = 0;
+  holdSpot: PlacementSpot | null = null;
+  holdTimer = 0;
 
   private dragPointerId: number | null = null;
-  private dragStart: Vector2D | null   = null;
+  private dragStart: Vector2D | null = null;
 
-  private readonly canvas:   HTMLCanvasElement;
+  private readonly canvas: HTMLCanvasElement;
   private readonly renderer: Renderer;
-  private readonly mapGrid:  MapGrid;
-  private readonly cb:       InputCallbacks;
+  private readonly mapGrid: MapGrid;
+  private readonly cb: InputCallbacks;
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -49,16 +49,16 @@ export class InputHandler {
     mapGrid: MapGrid,
     callbacks: InputCallbacks,
   ) {
-    this.canvas   = canvas;
+    this.canvas = canvas;
     this.renderer = renderer;
-    this.mapGrid  = mapGrid;
-    this.cb       = callbacks;
+    this.mapGrid = mapGrid;
+    this.cb = callbacks;
 
-    canvas.addEventListener('pointerdown',   this.onDown);
-    canvas.addEventListener('pointermove',   this.onMove);
-    canvas.addEventListener('pointerup',     this.onUp);
+    canvas.addEventListener('pointerdown', this.onDown);
+    canvas.addEventListener('pointermove', this.onMove);
+    canvas.addEventListener('pointerup', this.onUp);
     canvas.addEventListener('pointercancel', this.onUp);
-    canvas.addEventListener('pointerleave',  this.onUp);
+    canvas.addEventListener('pointerleave', this.onUp);
   }
 
   /**
@@ -69,8 +69,8 @@ export class InputHandler {
     if (this.holdSpot === null) return false;
     this.holdTimer += deltaTime;
     if (this.holdTimer >= HOLD_DURATION) {
-      const spot     = this.holdSpot;
-      this.holdSpot  = null;
+      const spot = this.holdSpot;
+      this.holdSpot = null;
       this.holdTimer = 0;
       this.cb.onBuildComplete(spot);
       return true;
@@ -80,38 +80,42 @@ export class InputHandler {
 
   reset(): void {
     if (this.dragPointerId !== null) {
-      try { this.canvas.releasePointerCapture(this.dragPointerId); } catch { /* already released */ }
+      try {
+        this.canvas.releasePointerCapture(this.dragPointerId);
+      } catch {
+        /* already released */
+      }
     }
-    this.holdSpot      = null;
-    this.holdTimer     = 0;
+    this.holdSpot = null;
+    this.holdTimer = 0;
     this.dragPointerId = null;
-    this.dragStart     = null;
+    this.dragStart = null;
   }
 
   destroy(): void {
-    this.canvas.removeEventListener('pointerdown',   this.onDown);
-    this.canvas.removeEventListener('pointermove',   this.onMove);
-    this.canvas.removeEventListener('pointerup',     this.onUp);
+    this.canvas.removeEventListener('pointerdown', this.onDown);
+    this.canvas.removeEventListener('pointermove', this.onMove);
+    this.canvas.removeEventListener('pointerup', this.onUp);
     this.canvas.removeEventListener('pointercancel', this.onUp);
-    this.canvas.removeEventListener('pointerleave',  this.onUp);
+    this.canvas.removeEventListener('pointerleave', this.onUp);
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
 
   private pointerToCanvas(e: PointerEvent): Vector2D {
-    const rect   = this.canvas.getBoundingClientRect();
-    const scaleX = this.renderer.width  / (rect.width  || 1);
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = this.renderer.width / (rect.width || 1);
     const scaleY = this.renderer.height / (rect.height || 1);
     return new Vector2D(
       (e.clientX - rect.left) * scaleX,
-      (e.clientY - rect.top)  * scaleY,
+      (e.clientY - rect.top) * scaleY,
     );
   }
 
   private clampToCanvas(v: Vector2D): Vector2D {
     // Player.hitRadius = 34; here we use the same constant value
     const r = 34 * 0.6;
-    const x = Math.max(r, Math.min(this.renderer.width  - r, v.x));
+    const x = Math.max(r, Math.min(this.renderer.width - r, v.x));
     const y = Math.max(r, Math.min(this.renderer.height - r, v.y));
     return new Vector2D(x, y);
   }
@@ -129,7 +133,7 @@ export class InputHandler {
     }
 
     this.dragPointerId = e.pointerId;
-    this.dragStart     = canvasPt.clone();
+    this.dragStart = canvasPt.clone();
     this.canvas.setPointerCapture?.(e.pointerId);
 
     // プレビュースポットの範囲内を押したら長押しビルド開始
@@ -139,14 +143,18 @@ export class InputHandler {
       const dx = Math.abs(canvasPt.x - center.x);
       const dy = Math.abs(canvasPt.y - center.y);
       if (dx <= TILE_SIZE && dy <= TILE_SIZE) {
-        this.holdSpot  = previewSpot;
+        this.holdSpot = previewSpot;
         this.holdTimer = 0;
         return;
       }
     }
 
     // ウェーブ中かつクールダウンなしなら敵へアタック
-    if (!this.cb.isInterWave() && !this.cb.hasAttackCooldown() && !this.cb.isPlayerAttacking()) {
+    if (
+      !this.cb.isInterWave() &&
+      !this.cb.hasAttackCooldown() &&
+      !this.cb.isPlayerAttacking()
+    ) {
       this.cb.onAttack();
       return;
     }
@@ -163,7 +171,7 @@ export class InputHandler {
       const dx = pt.x - this.dragStart.x;
       const dy = pt.y - this.dragStart.y;
       if (dx * dx + dy * dy > DRAG_CANCEL_THRESHOLD * DRAG_CANCEL_THRESHOLD) {
-        this.holdSpot  = null;
+        this.holdSpot = null;
         this.holdTimer = 0;
       }
     }
@@ -178,8 +186,8 @@ export class InputHandler {
       this.canvas.releasePointerCapture?.(e.pointerId);
     }
     this.dragPointerId = null;
-    this.dragStart     = null;
-    this.holdSpot      = null;
-    this.holdTimer     = 0;
+    this.dragStart = null;
+    this.holdSpot = null;
+    this.holdTimer = 0;
   };
 }

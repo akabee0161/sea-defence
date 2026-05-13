@@ -1,5 +1,5 @@
+import type { Renderer } from '../core/Renderer.ts';
 import { Vector2D } from '../utils/Vector2D.ts';
-import { Renderer } from '../core/Renderer.ts';
 
 export abstract class GameObject {
   protected position: Vector2D;

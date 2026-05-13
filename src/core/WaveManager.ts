@@ -1,5 +1,6 @@
-import { EnemyKind } from '../entities/Enemy.ts';
 import { WAVE_DEFS } from '../defs/waveDefs.ts';
+import type { EnemyKind } from '../entities/Enemy.ts';
+
 export type { SpawnEntry, WaveDef } from '../defs/waveDefs.ts';
 
 /** Called each time an enemy should spawn; receives kind and origin spawn-cell index. */
@@ -19,14 +20,14 @@ export class WaveManager {
   private phase: 'interval' | 'wave' | 'clear' = 'interval';
   private allEnemiesSpawnedTimestamp: number | null = null;
 
-  private readonly onSpawn:     SpawnCallback;
+  private readonly onSpawn: SpawnCallback;
   private readonly onWaveClear: WaveClearCallback | null;
 
   constructor(
     onSpawn: SpawnCallback,
     onWaveClear: WaveClearCallback | null = null,
   ) {
-    this.onSpawn     = onSpawn;
+    this.onSpawn = onSpawn;
     this.onWaveClear = onWaveClear;
   }
 
@@ -43,10 +44,11 @@ export class WaveManager {
     if (this.queueIndex < spawns.length) {
       this.spawnTimer -= deltaTime;
       if (this.spawnTimer <= 0) {
-        const entry     = spawns[this.queueIndex];
-        const nextDelay = this.queueIndex + 1 < spawns.length
-          ? (spawns[this.queueIndex + 1].delay ?? SPAWN_INTERVAL)
-          : SPAWN_INTERVAL;
+        const entry = spawns[this.queueIndex];
+        const nextDelay =
+          this.queueIndex + 1 < spawns.length
+            ? (spawns[this.queueIndex + 1].delay ?? SPAWN_INTERVAL)
+            : SPAWN_INTERVAL;
         this.spawnTimer = nextDelay;
         this.onSpawn(entry.enemyId, entry.spawnIdx);
         this.queueIndex++;
@@ -76,7 +78,7 @@ export class WaveManager {
     this.waveNumber++;
     this.queueIndex = 0;
     this.spawnTimer = 0;
-    this.phase      = 'wave';
+    this.phase = 'wave';
   }
 
   getAllEnemiesSpawnedTimestamp(): number | null {
@@ -85,10 +87,18 @@ export class WaveManager {
 
   // ── Public queries ─────────────────────────────────────────────────────────
 
-  get currentWave(): number  { return this.waveNumber; }
-  get totalWaves():  number  { return TOTAL_WAVES; }
-  get isInterWave(): boolean { return this.phase === 'interval'; }
-  get isGameClear(): boolean { return this.phase === 'clear'; }
+  get currentWave(): number {
+    return this.waveNumber;
+  }
+  get totalWaves(): number {
+    return TOTAL_WAVES;
+  }
+  get isInterWave(): boolean {
+    return this.phase === 'interval';
+  }
+  get isGameClear(): boolean {
+    return this.phase === 'clear';
+  }
 
   /** Aggregated enemy composition of the upcoming wave (empty if no more waves). */
   get nextWaveEnemies(): { kind: EnemyKind; count: number }[] {
@@ -102,7 +112,9 @@ export class WaveManager {
   }
 
   /** Per-spawn-cell enemy composition of the upcoming wave. */
-  nextWaveEnemiesBySpawn(spawnIdx: number): { kind: EnemyKind; count: number }[] {
+  nextWaveEnemiesBySpawn(
+    spawnIdx: number,
+  ): { kind: EnemyKind; count: number }[] {
     const next = this.waveNumber + 1;
     if (next > TOTAL_WAVES) return [];
     const counts = new Map<EnemyKind, number>();
@@ -114,18 +126,17 @@ export class WaveManager {
   }
 
   get waveProgress(): number {
-    const spawns = this.waveNumber >= 1
-      ? WAVE_DEFS[this.waveNumber - 1].spawns.length
-      : 0;
+    const spawns =
+      this.waveNumber >= 1 ? WAVE_DEFS[this.waveNumber - 1].spawns.length : 0;
     if (spawns === 0) return 0;
     return this.queueIndex / spawns;
   }
 
   reset(): void {
-    this.waveNumber              = 0;
-    this.queueIndex              = 0;
-    this.spawnTimer              = 0;
-    this.phase                   = 'interval';
+    this.waveNumber = 0;
+    this.queueIndex = 0;
+    this.spawnTimer = 0;
+    this.phase = 'interval';
     this.allEnemiesSpawnedTimestamp = null;
   }
 }

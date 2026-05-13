@@ -5,20 +5,20 @@ export interface GridCell {
 
 /** Neighbour expansion order — must stay fixed for deterministic tiebreak. */
 const NEIGHBOUR_DELTAS: readonly (readonly [number, number])[] = [
-  [-1,  0],
-  [ 1,  0],
-  [ 0, -1],
-  [ 0,  1],
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
 ];
 
 interface ANode {
-  col:         number;
-  row:         number;
-  g:           number;
-  h:           number;
-  f:           number;
+  col: number;
+  row: number;
+  g: number;
+  h: number;
+  f: number;
   insertOrder: number;
-  parent:      ANode | null;
+  parent: ANode | null;
 }
 
 /**
@@ -33,21 +33,25 @@ interface ANode {
  * @returns Array of cells from start to goal inclusive, or null if unreachable.
  */
 export function findPath(
-  start:      GridCell,
-  goal:       GridCell,
+  start: GridCell,
+  goal: GridCell,
   isWalkable: (col: number, row: number) => boolean,
 ): GridCell[] | null {
-  if (!isWalkable(start.col, start.row) || !isWalkable(goal.col, goal.row)) return null;
+  if (!isWalkable(start.col, start.row) || !isWalkable(goal.col, goal.row))
+    return null;
 
-  const open:   ANode[]            = [];
-  const closed: Set<string>        = new Set();
+  const open: ANode[] = [];
+  const closed: Set<string> = new Set();
   const inOpen: Map<string, ANode> = new Map();
   let insertCounter = 0;
 
   const h0 = manhattan(start, goal);
   const startNode: ANode = {
-    col: start.col, row: start.row,
-    g: 0, h: h0, f: h0,
+    col: start.col,
+    row: start.row,
+    g: 0,
+    h: h0,
+    f: h0,
     insertOrder: insertCounter++,
     parent: null,
   };
@@ -82,8 +86,11 @@ export function findPath(
       } else {
         const h = manhattan({ col: nc, row: nr }, goal);
         const node: ANode = {
-          col: nc, row: nr,
-          g: tentativeG, h, f: tentativeG + h,
+          col: nc,
+          row: nr,
+          g: tentativeG,
+          h,
+          f: tentativeG + h,
           insertOrder: insertCounter++,
           parent: cur,
         };
@@ -101,9 +108,15 @@ function pickBest(open: ANode[]): number {
   for (let i = 1; i < open.length; i++) {
     const a = open[i];
     const b = open[best];
-    if (a.f < b.f) { best = i; continue; }
+    if (a.f < b.f) {
+      best = i;
+      continue;
+    }
     if (a.f > b.f) continue;
-    if (a.h < b.h) { best = i; continue; }
+    if (a.h < b.h) {
+      best = i;
+      continue;
+    }
     if (a.h > b.h) continue;
     if (a.insertOrder < b.insertOrder) best = i;
   }

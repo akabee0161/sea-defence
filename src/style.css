@@ -40,14 +40,18 @@ body {
   image-rendering: pixelated;
   touch-action: none; /* prevent scroll/zoom interference on mobile */
   /* 小画面で上部が切れないようセーフエリアを除いた高さに収める */
-  max-height: calc(100svh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  max-height: calc(
+    100svh -
+    env(safe-area-inset-top) -
+    env(safe-area-inset-bottom)
+  );
 }
 
 /* ── HUD button bar (overlaid on top of canvas) ─────────────────────────── */
 
 #top-bar {
   position: fixed;
-  top: 10px;
+  top: 10px; /* biome-ignore lint/suspicious/noDuplicateProperties: CSS fallback for older browsers */
   top: max(10px, env(safe-area-inset-top));
   right: 8px;
   display: flex;
@@ -68,7 +72,9 @@ body {
   font-size: 0.82rem;
   cursor: pointer;
   touch-action: manipulation;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
   user-select: none;
   line-height: 1;
 }
@@ -90,7 +96,7 @@ body {
 }
 
 .start-btn:hover:not(:disabled) {
-  background: rgba(46, 204, 113, 0.30);
+  background: rgba(46, 204, 113, 0.3);
 }
 
 .start-btn:disabled {
@@ -105,14 +111,19 @@ body {
   padding: 0 8px;
   font-size: 0.72rem;
   letter-spacing: -0.3px;
-  border-color: rgba(46, 204, 113, 0.90);
+  border-color: rgba(46, 204, 113, 0.9);
   background: rgba(46, 204, 113, 0.28);
   animation: pulse-green 1.2s ease-in-out infinite;
 }
 
 @keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.55); }
-  50%       { box-shadow: 0 0 0 5px rgba(46, 204, 113, 0); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(46, 204, 113, 0);
+  }
 }
 
 /* Pause — lights up when paused */

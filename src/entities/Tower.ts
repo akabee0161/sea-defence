@@ -575,7 +575,7 @@ export class HermitCrabTower extends Tower {
       ctx.moveTo(tx - hw - 1, wy);
       ctx.quadraticCurveTo(tx, wy + 2, tx + hw + 1, wy);
       ctx.quadraticCurveTo(tx, wy + 4, tx - hw - 1, wy);
-      ctx.fillStyle = i % 2 === 0 ? '#a04520' : '#8b3a18';
+      ctx.fillStyle = '#7a3210';
       ctx.fill();
       ctx.strokeStyle = '#3d1005';
       ctx.lineWidth = 0.7;
@@ -655,9 +655,12 @@ export class HermitCrabTower extends Tower {
         ctx.stroke();
       }
 
+      const hcBodyGrad = ctx.createLinearGradient(cx, emergeY - 7, cx, emergeY + 7);
+      hcBodyGrad.addColorStop(0, '#f0913a');
+      hcBodyGrad.addColorStop(1, '#a04000');
       ctx.beginPath();
       ctx.ellipse(cx, emergeY, 10, 7, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#e67e22';
+      ctx.fillStyle = hcBodyGrad;
       ctx.fill();
       ctx.strokeStyle = '#a04000';
       ctx.lineWidth = 1.5;

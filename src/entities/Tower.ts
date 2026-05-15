@@ -363,17 +363,14 @@ export class CrabTower extends Tower {
       ctx.stroke();
     }
 
+    const crabBodyGrad = ctx.createLinearGradient(cx, cy - 9, cx, cy + 9);
+    crabBodyGrad.addColorStop(0, '#f0913a');
+    crabBodyGrad.addColorStop(1, '#a04000');
     ctx.beginPath();
     ctx.ellipse(cx, cy, 13, 9, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#e67e22';
+    ctx.fillStyle = crabBodyGrad;
     ctx.fill();
     ctx.strokeStyle = '#a04000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.ellipse(cx, cy - 2, 8, 4, 0, -Math.PI * 0.3, Math.PI * 0.3);
-    ctx.strokeStyle = 'rgba(255,200,100,0.40)';
     ctx.lineWidth = 2;
     ctx.stroke();
 

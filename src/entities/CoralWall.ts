@@ -120,14 +120,15 @@ export class CoralWall extends GameObject {
       [14, -23, '#ffd166'],
     ];
 
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = prevAlpha * alpha;
     for (const [tx, ty, color] of tips) {
       ctx.beginPath();
       ctx.arc(cx + tx, baseY + ty, 4, 0, Math.PI * 2);
       ctx.fillStyle = color;
-      ctx.globalAlpha = alpha;
       ctx.fill();
-      ctx.globalAlpha = 1;
     }
+    ctx.globalAlpha = prevAlpha;
   }
 
   private drawCracks(

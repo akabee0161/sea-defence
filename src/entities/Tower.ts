@@ -80,9 +80,69 @@ export class Tower extends GameObject {
 
 // ── Octopus Tower ─────────────────────────────────────────────────────────────
 
+interface InkDrop {
+  x: number; y: number;
+  vx: number; vy: number;
+  life: number; maxLife: number;
+  size: number;
+}
+
+// 各触手の制御点（cx, bcy からの相対オフセット: sx,sy, c1x,c1y, c2x,c2y, ex,ey）
+type TentacleDef = [number, number, number, number, number, number, number, number];
+const OCTOPUS_TENTACLES: TentacleDef[] = [
+  [-11,  7, -19,  9, -21, 16, -17, 21],
+  [ -9,  8, -14, 13, -14, 19, -11, 24],
+  [ -5,  9,  -7, 16,  -6, 22,  -4, 26],
+  [ -1, 10,  -2, 19,  -1, 25,   0, 27],
+  [  1, 10,   2, 19,   2, 25,   1, 27],
+  [  5,  9,   8, 16,   8, 22,   6, 26],
+  [  9,  8,  15, 13,  16, 19,  13, 24],
+  [ 11,  7,  20,  9,  22, 16,  18, 21],
+];
+
 export class OctopusTower extends Tower {
+  private ink: InkDrop[] = [];
+
   constructor(col: number, row: number) {
     super(col, row, TowerKind.Octopus);
+  }
+
+  override update(
+    deltaTime: number,
+    enemies: Enemy[],
+    bulletPool: ObjectPool<Bullet> | null,
+  ): void {
+    const prevCooldown = this.cooldown;
+    super.update(deltaTime, enemies, bulletPool);
+
+    if (this.cooldown > prevCooldown) {
+      const cx = this.position.x;
+      const cy = this.position.y;
+      for (let i = 0; i < 8; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 20 + Math.random() * 35;
+        const maxLife = 0.4 + Math.random() * 0.35;
+        this.ink.push({
+          x: cx + (Math.random() - 0.5) * 8,
+          y: cy + (Math.random() - 0.5) * 8,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: maxLife, maxLife,
+          size: 4 + Math.random() * 5,
+        });
+      }
+    }
+
+    const surviving: InkDrop[] = [];
+    for (const p of this.ink) {
+      p.x += p.vx * deltaTime;
+      p.y += p.vy * deltaTime;
+      p.vx *= 0.88;
+      p.vy *= 0.88;
+      p.life -= deltaTime;
+      if (p.life > 0) surviving.push(p);
+    }
+    this.ink = surviving;
   }
 
   override draw(renderer: Renderer): void {
@@ -95,67 +155,102 @@ export class OctopusTower extends Tower {
       this.position,
       this.range,
       'rgba(0,0,0,0)',
-      active ? 'rgba(142, 68, 173, 0.30)' : 'rgba(142, 68, 173, 0.10)',
+      active ? 'rgba(200, 80, 60, 0.25)' : 'rgba(200, 80, 60, 0.08)',
       1,
     );
 
-    const bodyR = 12;
-    const bodyY = cy - 3;
+    const bcy = cy - 3;
+    const bodyR = 13;
 
-    ctx.strokeStyle = '#6c3483';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-
-    const tCount = 6;
-    for (let i = 0; i < tCount; i++) {
-      const t = i / (tCount - 1);
-      const sx = cx + (t - 0.5) * bodyR * 1.7;
-      const sy = bodyY + bodyR * 0.75;
-      const spread = (t - 0.5) * 10;
-      const ex = sx + spread;
-      const ey = sy + 13;
-
+    // 墨煙（胴体・触手の背後に描画）
+    ctx.save();
+    for (const p of this.ink) {
+      const ratio = p.life / p.maxLife;
+      ctx.globalAlpha = ratio * 0.6;
+      ctx.fillStyle = '#0a0a14';
       ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.quadraticCurveTo(sx + spread * 0.5, sy + 7, ex, ey);
+      ctx.arc(p.x, p.y, p.size * ratio, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 触手（8本）— 三次ベジェ + 波打ちアニメーション
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (let i = 0; i < OCTOPUS_TENTACLES.length; i++) {
+      const [sx, sy, c1x, c1y, c2x, c2y, ex, ey] = OCTOPUS_TENTACLES[i];
+      const w = 0;
+
+      const ax  = cx + sx,      ay  = bcy + sy;
+      const b1x = cx + c1x + w, b1y = bcy + c1y;
+      const b2x = cx + c2x + w, b2y = bcy + c2y;
+      const aex = cx + ex,      aey = bcy + ey;
+
+      ctx.strokeStyle = '#c05848';
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.bezierCurveTo(b1x, b1y, b2x, b2y, aex, aey);
+      ctx.stroke();
+
+      // 吸盤（3個）— 三次ベジェ上をサンプリング
+      ctx.save();
+      for (const ts of [0.3, 0.6, 0.85]) {
+        const mt = 1 - ts;
+        const bx = mt**3*ax + 3*mt**2*ts*b1x + 3*mt*ts**2*b2x + ts**3*aex;
+        const by = mt**3*ay + 3*mt**2*ts*b1y + 3*mt*ts**2*b2y + ts**3*aey;
+        ctx.beginPath();
+        ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#f7d4cc';
+        ctx.fill();
+        ctx.strokeStyle = '#c06858';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 胴体（円 + ラジアルグラデーション）
+    const grad = ctx.createRadialGradient(cx - 3, bcy - 4, 2, cx, bcy, bodyR * 1.2);
+    grad.addColorStop(0,   '#f9d0c5');
+    grad.addColorStop(0.5, '#e07060');
+    grad.addColorStop(1,   '#b84040');
+
+    ctx.beginPath();
+    ctx.arc(cx, bcy, bodyR, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = '#9b3030';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 光沢（左上の反射）
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx - 4, bcy - 5, 4, 3, -0.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+    ctx.fill();
+    ctx.restore();
+
+    // 目（白い強膜 → 暗い瞳孔 → ハイライト）
+    for (const [ox, oy] of [[-5, -1.5], [5, -1.5]] as [number, number][]) {
+      ctx.beginPath();
+      ctx.arc(cx + ox, bcy + oy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = '#c06060';
+      ctx.lineWidth = 0.8;
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(ex, ey, 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#6c3483';
-      ctx.fill();
-    }
-
-    ctx.beginPath();
-    ctx.arc(cx, bodyY, bodyR, 0, Math.PI * 2);
-    ctx.fillStyle = '#9b59b6';
-    ctx.fill();
-    ctx.strokeStyle = '#6c3483';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(
-      cx - bodyR * 0.3,
-      bodyY - bodyR * 0.3,
-      bodyR * 0.38,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-    ctx.fill();
-
-    for (const [ox, oy] of [
-      [-4, -2],
-      [4, -2],
-    ] as [number, number][]) {
-      ctx.beginPath();
-      ctx.arc(cx + ox, bodyY + oy, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx + ox + 0.8, bodyY + oy + 0.5, 2, 0, Math.PI * 2);
+      ctx.arc(cx + ox + 0.5, bcy + oy + 0.3, 3, 0, Math.PI * 2);
       ctx.fillStyle = '#1a1a1a';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(cx + ox - 0.8, bcy + oy - 1.2, 1, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
       ctx.fill();
     }
   }

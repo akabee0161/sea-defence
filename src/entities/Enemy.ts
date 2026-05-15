@@ -109,9 +109,7 @@ export class Enemy extends GameObject {
   draw(renderer: Renderer): void {
     if (!this.active) return;
     const shakeOffsetX =
-      this.hitShakeTimer > 0
-        ? Math.sin(this.hitShakeTimer * 40) * 4
-        : 0;
+      this.hitShakeTimer > 0 ? Math.sin(this.hitShakeTimer * 40) * 4 : 0;
     if (this.dying) {
       const ctx = renderer.context;
       ctx.save();

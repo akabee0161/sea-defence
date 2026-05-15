@@ -81,23 +81,35 @@ export class Tower extends GameObject {
 // ── Octopus Tower ─────────────────────────────────────────────────────────────
 
 interface InkDrop {
-  x: number; y: number;
-  vx: number; vy: number;
-  life: number; maxLife: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
   size: number;
 }
 
 // 各触手の制御点（cx, bcy からの相対オフセット: sx,sy, c1x,c1y, c2x,c2y, ex,ey）
-type TentacleDef = [number, number, number, number, number, number, number, number];
+type TentacleDef = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 const OCTOPUS_TENTACLES: TentacleDef[] = [
-  [-11,  7, -19,  9, -21, 16, -17, 21],
-  [ -9,  8, -14, 13, -14, 19, -11, 24],
-  [ -5,  9,  -7, 16,  -6, 22,  -4, 26],
-  [ -1, 10,  -2, 19,  -1, 25,   0, 27],
-  [  1, 10,   2, 19,   2, 25,   1, 27],
-  [  5,  9,   8, 16,   8, 22,   6, 26],
-  [  9,  8,  15, 13,  16, 19,  13, 24],
-  [ 11,  7,  20,  9,  22, 16,  18, 21],
+  [-11, 7, -19, 9, -21, 16, -17, 21],
+  [-9, 8, -14, 13, -14, 19, -11, 24],
+  [-5, 9, -7, 16, -6, 22, -4, 26],
+  [-1, 10, -2, 19, -1, 25, 0, 27],
+  [1, 10, 2, 19, 2, 25, 1, 27],
+  [5, 9, 8, 16, 8, 22, 6, 26],
+  [9, 8, 15, 13, 16, 19, 13, 24],
+  [11, 7, 20, 9, 22, 16, 18, 21],
 ];
 
 export class OctopusTower extends Tower {
@@ -127,7 +139,8 @@ export class OctopusTower extends Tower {
           y: cy + (Math.random() - 0.5) * 8,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
-          life: maxLife, maxLife,
+          life: maxLife,
+          maxLife,
           size: 4 + Math.random() * 5,
         });
       }
@@ -181,10 +194,14 @@ export class OctopusTower extends Tower {
       const [sx, sy, c1x, c1y, c2x, c2y, ex, ey] = OCTOPUS_TENTACLES[i];
       const w = 0;
 
-      const ax  = cx + sx,      ay  = bcy + sy;
-      const b1x = cx + c1x + w, b1y = bcy + c1y;
-      const b2x = cx + c2x + w, b2y = bcy + c2y;
-      const aex = cx + ex,      aey = bcy + ey;
+      const ax = cx + sx,
+        ay = bcy + sy;
+      const b1x = cx + c1x + w,
+        b1y = bcy + c1y;
+      const b2x = cx + c2x + w,
+        b2y = bcy + c2y;
+      const aex = cx + ex,
+        aey = bcy + ey;
 
       ctx.strokeStyle = '#c05848';
       ctx.lineWidth = 3.5;
@@ -197,8 +214,16 @@ export class OctopusTower extends Tower {
       ctx.save();
       for (const ts of [0.3, 0.6, 0.85]) {
         const mt = 1 - ts;
-        const bx = mt**3*ax + 3*mt**2*ts*b1x + 3*mt*ts**2*b2x + ts**3*aex;
-        const by = mt**3*ay + 3*mt**2*ts*b1y + 3*mt*ts**2*b2y + ts**3*aey;
+        const bx =
+          mt ** 3 * ax +
+          3 * mt ** 2 * ts * b1x +
+          3 * mt * ts ** 2 * b2x +
+          ts ** 3 * aex;
+        const by =
+          mt ** 3 * ay +
+          3 * mt ** 2 * ts * b1y +
+          3 * mt * ts ** 2 * b2y +
+          ts ** 3 * aey;
         ctx.beginPath();
         ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
         ctx.fillStyle = '#f7d4cc';
@@ -213,9 +238,9 @@ export class OctopusTower extends Tower {
 
     // 胴体（円 + 線形グラデーション）
     const grad = ctx.createLinearGradient(cx, bcy - bodyR, cx, bcy + bodyR);
-    grad.addColorStop(0,   '#f9d0c5');
+    grad.addColorStop(0, '#f9d0c5');
     grad.addColorStop(0.5, '#e07060');
-    grad.addColorStop(1,   '#b84040');
+    grad.addColorStop(1, '#b84040');
 
     ctx.beginPath();
     ctx.arc(cx, bcy, bodyR, 0, Math.PI * 2);
@@ -226,7 +251,10 @@ export class OctopusTower extends Tower {
     ctx.stroke();
 
     // 目（白い強膜 → 暗い瞳孔 → ハイライト）
-    for (const [ox, oy] of [[-5, -1.5], [5, -1.5]] as [number, number][]) {
+    for (const [ox, oy] of [
+      [-5, -1.5],
+      [5, -1.5],
+    ] as [number, number][]) {
       ctx.beginPath();
       ctx.arc(cx + ox, bcy + oy, 4.5, 0, Math.PI * 2);
       ctx.fillStyle = '#ffffff';
@@ -556,7 +584,14 @@ export class HermitCrabTower extends Tower {
     ctx.beginPath();
     ctx.moveTo(tx, tipY);
     ctx.lineTo(tx + 12, baseY - 1);
-    ctx.bezierCurveTo(tx + 12, baseY + 4, tx - 10, baseY + 4, tx - 10, baseY - 1);
+    ctx.bezierCurveTo(
+      tx + 12,
+      baseY + 4,
+      tx - 10,
+      baseY + 4,
+      tx - 10,
+      baseY - 1,
+    );
     ctx.closePath();
     ctx.fillStyle = '#7a3210';
     ctx.fill();
@@ -655,7 +690,12 @@ export class HermitCrabTower extends Tower {
         ctx.stroke();
       }
 
-      const hcBodyGrad = ctx.createLinearGradient(cx, emergeY - 7, cx, emergeY + 7);
+      const hcBodyGrad = ctx.createLinearGradient(
+        cx,
+        emergeY - 7,
+        cx,
+        emergeY + 7,
+      );
       hcBodyGrad.addColorStop(0, '#f0913a');
       hcBodyGrad.addColorStop(1, '#a04000');
       ctx.beginPath();

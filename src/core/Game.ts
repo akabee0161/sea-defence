@@ -264,7 +264,12 @@ export class Game {
         }
       }
       if (justBroke) {
-        this.spawnParticles(coral.pos.x, coral.pos.y, '#c0392b', PARTICLES_KILL);
+        this.spawnParticles(
+          coral.pos.x,
+          coral.pos.y,
+          '#c0392b',
+          PARTICLES_KILL,
+        );
       }
     }
 
@@ -272,7 +277,8 @@ export class Game {
     for (const enemy of this.enemies) {
       if (!enemy.isDying) {
         const blocked = this.corals.some(
-          (c) => !c.isBroken && enemy.pos.distanceTo(c.pos) < CORAL_BLOCK_RADIUS,
+          (c) =>
+            !c.isBroken && enemy.pos.distanceTo(c.pos) < CORAL_BLOCK_RADIUS,
         );
         enemy.setSpeedMultiplier(blocked ? 0 : 1.0);
       }
@@ -370,7 +376,12 @@ export class Game {
     // 8. 死亡アニメーション完了した敵のバーストを生成してから除去
     for (const enemy of this.enemies) {
       if (!enemy.isActive) {
-        this.spawnParticles(enemy.pos.x, enemy.pos.y, COLOR_KILL, PARTICLES_KILL);
+        this.spawnParticles(
+          enemy.pos.x,
+          enemy.pos.y,
+          COLOR_KILL,
+          PARTICLES_KILL,
+        );
       }
     }
     this.enemies = this.enemies.filter((e) => e.isActive);

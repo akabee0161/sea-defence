@@ -9,6 +9,7 @@ export const EATING_INTERVAL = 1.0; // seconds between egg consumption at goal
 
 const HP_BAR_H = 5;
 const REACH_THRESHOLD = 4; // px — distance to snap to waypoint
+const DYING_DURATION = 0.7; // seconds for death fade animation
 
 export class Enemy extends GameObject {
   readonly kind: EnemyKind;
@@ -27,6 +28,8 @@ export class Enemy extends GameObject {
   currentGoalIdx: number; // index into GOAL_COLS; managed by Game
   private facingAngle = 0; // radians; 0 = facing right (+x)
   private speedMultiplier = 1.0; // 1.0 = normal, < 1 = slowed by coral
+  private dying = false;
+  private dyingTimer = 0;
 
   constructor(waypoints: Vector2D[], kind: EnemyKind = 'small', goalIdx = 0) {
     super(waypoints[0].x, waypoints[0].y);
@@ -56,8 +59,20 @@ export class Enemy extends GameObject {
     this.currentGoalIdx = goalIdx;
   }
 
+  get isDying(): boolean {
+    return this.dying;
+  }
+
   update(deltaTime: number): void {
-    if (!this.active || this.isAtGoal) return;
+    if (!this.active) return;
+
+    if (this.dying) {
+      this.dyingTimer += deltaTime;
+      if (this.dyingTimer >= DYING_DURATION) this.destroy();
+      return;
+    }
+
+    if (this.isAtGoal) return;
     if (this.waypointIndex >= this.waypoints.length) return;
 
     const target = this.waypoints[this.waypointIndex];
@@ -84,11 +99,19 @@ export class Enemy extends GameObject {
 
   draw(renderer: Renderer): void {
     if (!this.active) return;
-    this.drawShark(renderer);
+    if (this.dying) {
+      const ctx = renderer.context;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - this.dyingTimer / DYING_DURATION);
+      this.drawShark(renderer, true);
+      ctx.restore();
+      return;
+    }
+    this.drawShark(renderer, false);
     this.drawHpBar(renderer);
   }
 
-  private drawShark(renderer: Renderer): void {
+  private drawShark(renderer: Renderer, showDeadEyes: boolean): void {
     const ctx = renderer.context;
     const { x, y } = this.position;
     const r = this.radius;
@@ -162,33 +185,46 @@ export class Enemy extends GameObject {
     ctx.fillStyle = this.finColor;
     ctx.fill();
 
-    // ── Eye: angry crescent ───────────────────────────────────────────────────
+    // ── Eye ───────────────────────────────────────────────────────────────────
     const ex = r * 0.48;
     const ey = -r * 0.24;
     const er = Math.max(r * 0.22, 3.5);
 
-    ctx.beginPath();
-    ctx.arc(ex, ey, er, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.fill();
+    if (showDeadEyes) {
+      const xs = er * 0.9;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(r * 0.14, 2);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ex - xs, ey - xs);
+      ctx.lineTo(ex + xs, ey + xs);
+      ctx.moveTo(ex + xs, ey - xs);
+      ctx.lineTo(ex - xs, ey + xs);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(ex, ey, er, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(ex, ey, er, 0, Math.PI * 2);
-    ctx.clip();
-    ctx.beginPath();
-    ctx.arc(ex + er * 0.1, ey - er * 0.55, er * 1.05, 0, Math.PI * 2);
-    ctx.fillStyle = '#111111';
-    ctx.fill();
-    ctx.restore();
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(ex, ey, er, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.beginPath();
+      ctx.arc(ex + er * 0.1, ey - er * 0.55, er * 1.05, 0, Math.PI * 2);
+      ctx.fillStyle = '#111111';
+      ctx.fill();
+      ctx.restore();
 
-    ctx.beginPath();
-    ctx.moveTo(ex - er * 1.0, ey - er * 1.35);
-    ctx.lineTo(ex + er * 0.9, ey - er * 0.7);
-    ctx.strokeStyle = this.finColor;
-    ctx.lineWidth = Math.max(r * 0.15, 2);
-    ctx.lineCap = 'round';
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ex - er * 1.0, ey - er * 1.35);
+      ctx.lineTo(ex + er * 0.9, ey - er * 0.7);
+      ctx.strokeStyle = this.finColor;
+      ctx.lineWidth = Math.max(r * 0.15, 2);
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
 
     ctx.restore();
   }
@@ -211,8 +247,9 @@ export class Enemy extends GameObject {
   }
 
   takeDamage(amount: number): void {
+    if (this.dying) return;
     this.hp = Math.max(0, this.hp - amount);
-    if (this.hp <= 0) this.destroy();
+    if (this.hp <= 0) this.dying = true;
   }
 
   get currentHp(): number {

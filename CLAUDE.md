@@ -14,9 +14,9 @@
 幼児向け海テーマのタワーディフェンス。敵＝サメ、タワー＝タコ、壁＝珊瑚、守るもの＝卵。
 
 - **マップ**：8×13 タイル（`TILE_SIZE = 50px`）。上部 50px は HUD バー（`GRID_OFFSET_Y = 50`）。canvas は 400×700px。
-- **経路**：5本の独立したジグザグ経路（`RAW_PATHS` in MapGrid.ts）。最初は経路0のみ有効。
+- **経路**：5本の独立したジグザグ経路（`MAP_DEF.paths` in mapDefs.ts）。最初は経路0のみ有効。
 - **資源**：通常卵（HP）とひび割れ卵（建設コスト）の2種。Wave クリアでひび割れ卵が増える。
-- **タワー**：Octopus（射撃）/ Crab（パトロール＋爪攻撃）/ HermitCrab（出現＋攻撃）/ Eel（伸び噛み）/ Coral（スロー壁）の5種。
+- **タワー**：Octopus（射撃）/ Crab（パトロール＋爪攻撃）/ HermitCrab（出現＋攻撃）/ Eel（伸び噛み）/ Coral（ブロック壁・HP制）の5種。
 - **設置**：2秒長押しで設置（コスト: ひび割れ卵1個）。
 - **フロー**：ビルドフェーズ → Wave → Wave クリア後に卵を右端のゴールタップで経路追加 → 繰り返し（5Wave でクリア）。
 
@@ -33,7 +33,7 @@ npm run format   # Biome フォーマット自動修正（src/ 対象）
 ## 拡張時の注意
 
 - エンティティ間の参照は `Game` クラスが仲介（Mediator パターン）。
-- `GameObject.active === false` のオブジェクトはループ末尾で除去。
+- `GameObject.active === false` のオブジェクトはループ末尾で除去。ただし `CoralWall` は Wave 間の復活のため `active` でなく `broken` フラグで破壊状態を管理する。
 - 新エンティティは `ObjectPool` を使い GC 負荷を抑える（既存の管理対象: `Bullet`, `Particle`）。
 - `TileType` は `enum`（`const enum` 不可、isolatedModules: true のため）。
 - ピクセル座標はタイル座標に `GRID_OFFSET_Y` を加算すること（Tower・CoralWall 参照）。

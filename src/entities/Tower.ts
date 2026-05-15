@@ -51,7 +51,7 @@ export class Tower extends GameObject {
     this.target = null;
     let minDist = Infinity;
     for (const enemy of enemies) {
-      if (!enemy.isActive) continue;
+      if (!enemy.isActive || enemy.isDying) continue;
       const dist = this.position.distanceTo(enemy.pos);
       if (dist <= this.range && dist < minDist) {
         minDist = dist;
@@ -229,7 +229,7 @@ export class CrabTower extends Tower {
       let nearest: Enemy | null = null;
       let nearestDist = Infinity;
       for (const enemy of enemies) {
-        if (!enemy.isActive) continue;
+        if (!enemy.isActive || enemy.isDying) continue;
         const dist = this.position.distanceTo(enemy.pos);
         if (dist <= this.range && dist < nearestDist) {
           nearestDist = dist;
@@ -406,7 +406,7 @@ export class HermitCrabTower extends Tower {
     let nearest: Enemy | null = null;
     let nearestDist = Infinity;
     for (const enemy of enemies) {
-      if (!enemy.isActive) continue;
+      if (!enemy.isActive || enemy.isDying) continue;
       const dist = this.position.distanceTo(enemy.pos);
       if (dist <= this.range && dist < nearestDist) {
         nearestDist = dist;
@@ -451,24 +451,106 @@ export class HermitCrabTower extends Tower {
 
     ctx.save();
     ctx.globalAlpha *= 1 - prog * 0.6;
+
+    // 三角形の巻貝（棘付き円錐螺旋貝）
+    const tx = cx + 2;
+    const tipY = cy - 18;
+    const baseY = cy + 8;
+    const shellH = baseY - tipY;
+
+    // 影・暗い側面
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 14);
-    ctx.bezierCurveTo(cx + 13, cy - 10, cx + 13, cy + 4, cx, cy + 6);
-    ctx.bezierCurveTo(cx - 13, cy + 4, cx - 13, cy - 10, cx, cy - 14);
-    ctx.fillStyle = '#8e6030';
+    ctx.moveTo(tx, tipY);
+    ctx.lineTo(tx + 15, baseY + 2);
+    ctx.lineTo(tx - 12, baseY + 2);
+    ctx.closePath();
+    ctx.fillStyle = '#4a1c05';
     ctx.fill();
-    ctx.strokeStyle = '#5a3a10';
-    ctx.lineWidth = 1.5;
+
+    // メインボディ（円錐）
+    ctx.beginPath();
+    ctx.moveTo(tx, tipY);
+    ctx.lineTo(tx + 12, baseY - 1);
+    ctx.bezierCurveTo(tx + 12, baseY + 4, tx - 10, baseY + 4, tx - 10, baseY - 1);
+    ctx.closePath();
+    ctx.fillStyle = '#7a3210';
+    ctx.fill();
+    ctx.strokeStyle = '#3d1005';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 渦巻き輪郭（4段）と棘
+    const whorlTs = [0.22, 0.44, 0.64, 0.82];
+    for (let i = 0; i < whorlTs.length; i++) {
+      const wy = tipY + shellH * whorlTs[i];
+      const hw = 10 * whorlTs[i] + 1;
+
+      // 輪帯（光沢ライン）
+      ctx.beginPath();
+      ctx.moveTo(tx - hw - 1, wy);
+      ctx.quadraticCurveTo(tx, wy + 2, tx + hw + 1, wy);
+      ctx.quadraticCurveTo(tx, wy + 4, tx - hw - 1, wy);
+      ctx.fillStyle = i % 2 === 0 ? '#a04520' : '#8b3a18';
+      ctx.fill();
+      ctx.strokeStyle = '#3d1005';
+      ctx.lineWidth = 0.7;
+      ctx.stroke();
+
+      // 左右の大きな棘
+      if (i > 0) {
+        const sLen = 4 + i * 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#3d1005';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(tx - hw, wy);
+        ctx.lineTo(tx - hw - sLen * 0.6, wy - sLen);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(tx + hw, wy);
+        ctx.lineTo(tx + hw + sLen * 0.6, wy - sLen);
+        ctx.stroke();
+      }
+
+      // 中間の小棘（上段ほど少なく）
+      const smallSpines = i + 1;
+      ctx.strokeStyle = '#5c1e08';
+      ctx.lineWidth = 1;
+      ctx.lineCap = 'round';
+      for (let s = 0; s < smallSpines; s++) {
+        const frac = (s + 0.5) / smallSpines;
+        const sx = tx - hw + hw * 2 * frac;
+        const outX = (sx - tx) * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(sx, wy - 0.5);
+        ctx.lineTo(sx + outX, wy - 3 - i * 1.2);
+        ctx.stroke();
+      }
+    }
+
+    // 貝口（緑がかった真珠層）
+    ctx.beginPath();
+    ctx.ellipse(tx, baseY + 2, 7, 4.5, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#3a6e4e';
+    ctx.fill();
+    ctx.strokeStyle = '#3d1005';
+    ctx.lineWidth = 1;
     ctx.stroke();
     ctx.beginPath();
-    ctx.arc(cx + 2, cy - 2, 4.5, 0.2, Math.PI * 1.6);
-    ctx.strokeStyle = '#5a3a10';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+    ctx.ellipse(tx, baseY + 2, 4.5, 2.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#2a5038';
+    ctx.fill();
+
+    // 先端ハイライト
+    ctx.beginPath();
+    ctx.arc(tx - 1, tipY + 3, 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = '#c06030';
+    ctx.fill();
+
     ctx.restore();
 
     if (prog > 0.05) {
-      const emergeY = cy + 10 - prog * 18;
+      const emergeY = cy + 10;
 
       ctx.save();
       ctx.globalAlpha *= prog;
@@ -537,19 +619,26 @@ export class HermitCrabTower extends Tower {
 
 // ── Eel Tower ─────────────────────────────────────────────────────────────────
 
-type EelState = 'idle' | 'stretching' | 'biting' | 'retracting';
+type EelState =
+  | 'idle'
+  | 'anticipating'
+  | 'stretching'
+  | 'biting'
+  | 'retracting';
 
 export class EelTower extends Tower {
   private eelState: EelState = 'idle';
   private stretchProgress = 0;
   private biteTimer = 0;
+  private anticipateTimer = 0;
   private stretchTarget: Enemy | null = null;
   private stretchDir: Vector2D = Vector2D.zero();
   private stretchMaxDist = 0;
 
-  private static readonly STRETCH_TIME = 0.5;
-  private static readonly BITE_TIME = 0.2;
-  private static readonly RETRACT_TIME = 0.4;
+  private static readonly ANTICIPATE_TIME = 0.22;
+  private static readonly STRIKE_TIME = 0.09;
+  private static readonly BITE_TIME = 0.18;
+  private static readonly RETRACT_TIME = 0.72;
 
   constructor(col: number, row: number) {
     super(col, row, TowerKind.Eel);
@@ -574,15 +663,29 @@ export class EelTower extends Tower {
             this.stretchMaxDist = Math.min(toEnemy.magnitude(), this.range);
             this.stretchDir = toEnemy.normalize();
             this.stretchProgress = 0;
-            this.eelState = 'stretching';
+            this.anticipateTimer = 0;
+            this.eelState = 'anticipating';
           }
+        }
+        break;
+      }
+      case 'anticipating': {
+        this.anticipateTimer += deltaTime;
+        if (this.stretchTarget?.isActive) {
+          const toEnemy = this.stretchTarget.pos.subtract(this.position);
+          this.stretchMaxDist = Math.min(toEnemy.magnitude(), this.range);
+          this.stretchDir = toEnemy.normalize();
+        }
+        if (this.anticipateTimer >= EelTower.ANTICIPATE_TIME) {
+          this.stretchProgress = 0;
+          this.eelState = 'stretching';
         }
         break;
       }
       case 'stretching': {
         this.stretchProgress = Math.min(
           1,
-          this.stretchProgress + deltaTime / EelTower.STRETCH_TIME,
+          this.stretchProgress + deltaTime / EelTower.STRIKE_TIME,
         );
         if (this.stretchProgress >= 1) {
           this.eelState = 'biting';
@@ -619,7 +722,7 @@ export class EelTower extends Tower {
     let nearest: Enemy | null = null;
     let nearestDist = Infinity;
     for (const enemy of enemies) {
-      if (!enemy.isActive) continue;
+      if (!enemy.isActive || enemy.isDying) continue;
       const dist = this.position.distanceTo(enemy.pos);
       if (dist <= this.range && dist < nearestDist) {
         nearestDist = dist;
@@ -654,68 +757,244 @@ export class EelTower extends Tower {
     );
 
     if (state === 'idle') {
+      ctx.save();
+      // Body: thick dark-brown S-curve (same width as head)
       ctx.beginPath();
       ctx.moveTo(cx, cy + 10);
       ctx.bezierCurveTo(cx + 13, cy + 4, cx - 13, cy, cx, cy - 5);
       ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8, cy - 18, cx, cy - 18);
-      ctx.strokeStyle = '#8f6446';
-      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#8a6a08';
+      ctx.lineWidth = 13;
       ctx.lineCap = 'round';
       ctx.stroke();
+      // Dark-brown spots along S-curve body
+      ctx.fillStyle = '#3a2008';
+      for (const [sx, sy, sr] of [
+        [cx, cy + 2, 3.5],
+        [cx + 2, cy - 6, 3],
+        [cx + 5, cy - 13, 3],
+      ] as [number, number, number][]) {
+        ctx.beginPath();
+        ctx.arc(sx, sy, sr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // moray head: body joins at right (x+), mouth/fangs at left (x-)
+      ctx.save();
+      ctx.translate(cx, cy - 18);
+      // upper jaw (main head body, left = snout, right = body junction)
       ctx.beginPath();
-      ctx.ellipse(cx, cy - 18, 6, 4, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#6f4d3e';
+      ctx.moveTo(5, -2); // body junction upper
+      ctx.lineTo(3, -7); // upper right
+      ctx.lineTo(-3, -8); // top
+      ctx.lineTo(-11, -4); // upper snout
+      ctx.lineTo(-15, 0); // snout tip
+      ctx.lineTo(-11, 3); // lower snout
+      ctx.lineTo(-3, 4); // chin
+      ctx.lineTo(5, 2); // body junction lower
+      ctx.closePath();
+      ctx.fillStyle = '#8a6a08';
       ctx.fill();
-      ctx.strokeStyle = '#4b2d16';
+      ctx.strokeStyle = '#1a0800';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Dark spots on head
+      ctx.fillStyle = '#3a2008';
+      ctx.beginPath();
+      ctx.arc(-1, -5, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(-7, -1, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // lower jaw
+      ctx.beginPath();
+      ctx.moveTo(-3, 4);
+      ctx.lineTo(-11, 6);
+      ctx.lineTo(-15, 1);
+      ctx.lineTo(-15, 0); // snout tip
+      ctx.lineTo(-11, 3);
+      ctx.lineTo(-3, 4);
+      ctx.fillStyle = '#a07c0a';
+      ctx.fill();
+      ctx.strokeStyle = '#1a0800';
       ctx.lineWidth = 1;
       ctx.stroke();
+      // upper fangs (pointing down into mouth, on left/mouth side)
+      ctx.fillStyle = '#f2f0d8';
+      ctx.beginPath();
+      ctx.moveTo(-5, 3);
+      ctx.lineTo(-3.5, -1);
+      ctx.lineTo(-2, 3);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-9, 2);
+      ctx.lineTo(-7.5, -2);
+      ctx.lineTo(-6, 2);
+      ctx.fill();
+      // eye (upper right – near body junction side)
+      ctx.beginPath();
+      ctx.arc(2, -4, 3, 0, Math.PI * 2);
+      ctx.fillStyle = '#d4a800';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(2.4, -4, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#111';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(0.8, -5.2, 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      ctx.fill();
+      ctx.restore();
+      ctx.restore();
       return;
     }
 
-    const head = this.headPos;
+    // anticipating: visually creep forward just a little in attack direction
+    const visualProgress =
+      state === 'anticipating'
+        ? (this.anticipateTimer / EelTower.ANTICIPATE_TIME) * 0.14
+        : this.stretchProgress;
+
+    const head = this.position.add(
+      this.stretchDir.scale(visualProgress * this.stretchMaxDist),
+    );
     const perp = new Vector2D(-this.stretchDir.y, this.stretchDir.x);
-    const midX = cx + (head.x - cx) * 0.5 + perp.x * 12 * this.stretchProgress;
-    const midY = cy + (head.y - cy) * 0.5 + perp.y * 12 * this.stretchProgress;
+    const midX = cx + (head.x - cx) * 0.5 + perp.x * 12 * visualProgress;
+    const midY = cy + (head.y - cy) * 0.5 + perp.y * 12 * visualProgress;
 
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.quadraticCurveTo(midX, midY, head.x, head.y);
-    ctx.strokeStyle = '#8f6446';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = state === 'anticipating' ? '#a07c0a' : '#8a6a08';
+    ctx.lineWidth = 13;
     ctx.lineCap = 'round';
     ctx.stroke();
 
+    // Dark spots along stretched body (quadratic bezier at t=0.3, 0.6)
+    ctx.fillStyle = '#3a2008';
+    for (const t of [0.3, 0.6]) {
+      const bx =
+        (1 - t) * (1 - t) * cx + 2 * t * (1 - t) * midX + t * t * head.x;
+      const by =
+        (1 - t) * (1 - t) * cy + 2 * t * (1 - t) * midY + t * t * head.y;
+      ctx.beginPath();
+      ctx.arc(bx, by, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.beginPath();
-    ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#6f4d3e';
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#8a6a08';
     ctx.fill();
+
+    // jaw opens during biting (sin curve: 0→max→0)
+    const jawOpenY =
+      state === 'biting'
+        ? Math.sin((this.biteTimer / EelTower.BITE_TIME) * Math.PI) * 11
+        : 0;
 
     const headAngle = Math.atan2(this.stretchDir.y, this.stretchDir.x);
     ctx.save();
     ctx.translate(head.x, head.y);
     ctx.rotate(headAngle);
+
+    // mouth cavity (drawn behind jaws so it shows through the gap)
+    if (jawOpenY > 0.5) {
+      ctx.beginPath();
+      ctx.moveTo(-2, 2);
+      ctx.lineTo(20, 0);
+      ctx.lineTo(14, 3 + jawOpenY * 0.6);
+      ctx.lineTo(-2, 2 + jawOpenY * 0.25);
+      ctx.fillStyle = '#1a0500';
+      ctx.fill();
+    }
+
+    // upper jaw
     ctx.beginPath();
-    ctx.ellipse(0, 0, 9, 5, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#6f4d3e';
+    ctx.moveTo(-12, 0);
+    ctx.lineTo(-10, -8);
+    ctx.lineTo(2, -10);
+    ctx.lineTo(14, -6);
+    ctx.lineTo(22, 0);
+    ctx.lineTo(14, 4);
+    ctx.lineTo(2, 5);
+    ctx.lineTo(-10, 3);
+    ctx.closePath();
+    ctx.fillStyle = '#8a6a08';
     ctx.fill();
-    ctx.strokeStyle = '#4b2d16';
+    ctx.strokeStyle = '#1a0800';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Dark spots on upper jaw
+    ctx.fillStyle = '#3a2008';
+    ctx.beginPath();
+    ctx.arc(4, -5, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(12, -3, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // lower jaw (drops by jawOpenY)
+    ctx.beginPath();
+    ctx.moveTo(-10, 3);
+    ctx.lineTo(-8, 4 + jawOpenY * 0.3);
+    ctx.lineTo(2, 6 + jawOpenY * 0.85);
+    ctx.lineTo(14, 4 + jawOpenY * 0.65);
+    ctx.lineTo(22, 0 + jawOpenY * 0.15);
+    ctx.lineTo(14, 4);
+    ctx.lineTo(2, 5);
+    ctx.lineTo(-10, 3);
+    ctx.fillStyle = '#a07c0a';
+    ctx.fill();
+    ctx.strokeStyle = '#1a0800';
     ctx.lineWidth = 1;
     ctx.stroke();
+
+    // upper fangs (3, pointing downward into mouth)
+    ctx.fillStyle = '#f2f0d8';
+    const upperFangs: [number, number][] = [
+      [14, -5],
+      [9, -6],
+      [4, -5],
+    ];
+    for (const [fx, fy] of upperFangs) {
+      ctx.beginPath();
+      ctx.moveTo(fx - 2.5, fy + 6);
+      ctx.lineTo(fx, fy);
+      ctx.lineTo(fx + 2.5, fy + 6);
+      ctx.fill();
+    }
+
+    // lower fangs (fade in when mouth opens)
+    if (jawOpenY > 1) {
+      ctx.globalAlpha = Math.min(1, (jawOpenY - 1) / 4);
+      const lowerFangs: [number, number][] = [
+        [13, 4 + jawOpenY * 0.55],
+        [8, 5 + jawOpenY * 0.65],
+      ];
+      for (const [fx, fy] of lowerFangs) {
+        ctx.beginPath();
+        ctx.moveTo(fx - 2, fy - 2);
+        ctx.lineTo(fx, fy + 4);
+        ctx.lineTo(fx + 2, fy - 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // eye (golden iris)
     ctx.beginPath();
-    ctx.moveTo(8, -4);
-    ctx.lineTo(13, 0);
-    ctx.lineTo(8, 4);
-    ctx.closePath();
-    ctx.fillStyle = '#6f4d3e';
+    ctx.arc(-4, -5, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4a800';
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(-2, -3, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(-1.5, -3, 1.2, 0, Math.PI * 2);
+    ctx.arc(-3.5, -5, 2.2, 0, Math.PI * 2);
     ctx.fillStyle = '#111';
     ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-5.5, -6.5, 1.1, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fill();
+
     ctx.restore();
   }
 }

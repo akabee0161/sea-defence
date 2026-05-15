@@ -47,15 +47,17 @@ body {
   );
 }
 
-/* ── HUD button bar (overlaid on top of canvas) ─────────────────────────── */
+/* ── HUD button bar (overlaid on canvas HUD strip) ──────────────────────── */
 
 #top-bar {
-  position: fixed;
-  top: 10px; /* biome-ignore lint/suspicious/noDuplicateProperties: CSS fallback for older browsers */
-  top: max(10px, env(safe-area-inset-top));
-  right: 8px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 7.143%; /* 50px / 700px canvas height */
   display: flex;
+  align-items: center;
   gap: 5px;
+  padding-right: 6px;
   z-index: 10;
 }
 

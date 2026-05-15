@@ -78,6 +78,7 @@ export class WaveManager {
     this.waveNumber++;
     this.queueIndex = 0;
     this.spawnTimer = 0;
+    this.allEnemiesSpawnedTimestamp = null;
     this.phase = 'wave';
   }
 

@@ -238,6 +238,7 @@ export class CrabTower extends Tower {
       }
       if (nearest !== null) {
         nearest.takeDamage(this.damage);
+        nearest.stun(0.2);
         this.cooldown = 1 / this.fireRate;
         this.attackFlash = CrabTower.FLASH_TIME;
         this.target = nearest;

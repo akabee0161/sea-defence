@@ -29,6 +29,8 @@ export class Enemy extends GameObject {
   private speedMultiplier = 1.0; // 1.0 = normal, < 1 = slowed by coral
   private dying = false;
   private dyingTimer = 0;
+  private stunTimer = 0;
+  private hitShakeTimer = 0;
 
   constructor(waypoints: Vector2D[], kind: EnemyKind = 'small', goalIdx = 0) {
     super(waypoints[0].x, waypoints[0].y);
@@ -71,7 +73,15 @@ export class Enemy extends GameObject {
       return;
     }
 
+    if (this.stunTimer > 0) {
+      this.stunTimer = Math.max(0, this.stunTimer - deltaTime);
+    }
+    if (this.hitShakeTimer > 0) {
+      this.hitShakeTimer = Math.max(0, this.hitShakeTimer - deltaTime);
+    }
+
     if (this.isAtGoal) return;
+    if (this.stunTimer > 0) return;
     if (this.waypointIndex >= this.waypoints.length) return;
 
     const target = this.waypoints[this.waypointIndex];
@@ -98,16 +108,30 @@ export class Enemy extends GameObject {
 
   draw(renderer: Renderer): void {
     if (!this.active) return;
+    const shakeOffsetX =
+      this.hitShakeTimer > 0
+        ? Math.sin(this.hitShakeTimer * 40) * 4
+        : 0;
     if (this.dying) {
       const ctx = renderer.context;
       ctx.save();
       ctx.globalAlpha = Math.max(0, 1 - this.dyingTimer / DYING_DURATION);
+      ctx.translate(shakeOffsetX, 0);
       this.drawShark(renderer, true);
       ctx.restore();
       return;
     }
-    this.drawShark(renderer, false);
-    this.drawHpBar(renderer);
+    if (shakeOffsetX !== 0) {
+      const ctx = renderer.context;
+      ctx.save();
+      ctx.translate(shakeOffsetX, 0);
+      this.drawShark(renderer, false);
+      this.drawHpBar(renderer);
+      ctx.restore();
+    } else {
+      this.drawShark(renderer, false);
+      this.drawHpBar(renderer);
+    }
   }
 
   private drawShark(renderer: Renderer, showDeadEyes: boolean): void {
@@ -239,6 +263,12 @@ export class Enemy extends GameObject {
     const barColor =
       ratio > 0.5 ? '#2ecc71' : ratio > 0.25 ? '#f39c12' : '#e74c3c';
     renderer.drawRect(barPos, barW * ratio, HP_BAR_H, barColor);
+  }
+
+  stun(duration: number): void {
+    if (this.dying) return;
+    this.stunTimer = Math.max(this.stunTimer, duration);
+    this.hitShakeTimer = Math.max(this.hitShakeTimer, 0.3);
   }
 
   setSpeedMultiplier(m: number): void {

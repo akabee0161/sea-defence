@@ -32,7 +32,8 @@ const ATTACK_COOLDOWN = 2.0;
 const ATTACK_DAMAGE = 50;
 const ATTACK_SPEED = 600;
 const ATTACK_HIT_DIST = 8;
-const CORAL_SLOW_RADIUS = 30;
+const CORAL_BLOCK_RADIUS = 28;
+const CORAL_DAMAGE_PER_SECOND = 30;
 const PLAYER_PREVIEW_RADIUS = 75;
 const PREVIEW_ALPHA = 0.4;
 
@@ -250,12 +251,31 @@ export class Game {
     // 1. ウェーブマネージャ更新（スポーン発生）
     this.waveManager.update(deltaTime, this.enemies.length);
 
-    // 2. 珊瑚スロー適用 + 敵移動
+    // 2. 珊瑚ダメージ適用（接触中の敵の数だけ毎秒削れる）
+    for (const coral of this.corals) {
+      if (coral.isBroken) continue;
+      let justBroke = false;
+      for (const enemy of this.enemies) {
+        if (!enemy.isActive || enemy.isDying) continue;
+        if (enemy.pos.distanceTo(coral.pos) < CORAL_BLOCK_RADIUS) {
+          if (coral.takeDamage(CORAL_DAMAGE_PER_SECOND * deltaTime)) {
+            justBroke = true;
+          }
+        }
+      }
+      if (justBroke) {
+        this.spawnParticles(coral.pos.x, coral.pos.y, '#c0392b', PARTICLES_KILL);
+      }
+    }
+
+    // 2b. 珊瑚ブロック適用 + 敵移動
     for (const enemy of this.enemies) {
-      const slowed = this.corals.some(
-        (c) => enemy.pos.distanceTo(c.pos) < CORAL_SLOW_RADIUS,
-      );
-      enemy.setSpeedMultiplier(slowed ? 0.2 : 1.0);
+      if (!enemy.isDying) {
+        const blocked = this.corals.some(
+          (c) => !c.isBroken && enemy.pos.distanceTo(c.pos) < CORAL_BLOCK_RADIUS,
+        );
+        enemy.setSpeedMultiplier(blocked ? 0 : 1.0);
+      }
       enemy.update(deltaTime);
     }
 
@@ -273,7 +293,7 @@ export class Game {
     for (const bullet of this.bulletPool.all) {
       if (!bullet.isActive) continue;
       for (const enemy of this.enemies) {
-        if (!enemy.isActive) continue;
+        if (!enemy.isActive || enemy.isDying) continue;
         if (bullet.pos.distanceTo(enemy.pos) <= bullet.radius + enemy.radius) {
           enemy.takeDamage(bullet.damage);
           this.spawnParticles(
@@ -282,14 +302,8 @@ export class Game {
             COLOR_HIT,
             PARTICLES_HIT,
           );
-          if (!enemy.isActive) {
+          if (enemy.isDying) {
             this.scoreManager.recordKill(enemy.reward);
-            this.spawnParticles(
-              enemy.pos.x,
-              enemy.pos.y,
-              COLOR_KILL,
-              PARTICLES_KILL,
-            );
           }
           this.bulletPool.release(bullet);
           break;
@@ -307,7 +321,7 @@ export class Game {
     const toRedirect = new Set<Enemy>();
 
     for (const enemy of this.enemies) {
-      if (!enemy.isActive) continue;
+      if (!enemy.isActive || enemy.isDying) continue;
 
       if (enemy.isAtGoal) {
         const gi = enemy.currentGoalIdx;
@@ -348,13 +362,18 @@ export class Game {
       this.gameOver = true;
     }
 
-    // 8. 非アクティブ敵を除去
+    // 8. 死亡アニメーション完了した敵のバーストを生成してから除去
+    for (const enemy of this.enemies) {
+      if (!enemy.isActive) {
+        this.spawnParticles(enemy.pos.x, enemy.pos.y, COLOR_KILL, PARTICLES_KILL);
+      }
+    }
     this.enemies = this.enemies.filter((e) => e.isActive);
 
     // 9. プレイヤー更新・ダッシュアタック
     this.player.update(deltaTime);
     if (this.isPlayerAttacking) {
-      if (!this.attackTarget?.isActive) {
+      if (!this.attackTarget?.isActive || this.attackTarget.isDying) {
         this.endAttack();
       } else {
         const toTarget = this.attackTarget.pos.subtract(this.player.pos);
@@ -368,14 +387,8 @@ export class Game {
             COLOR_HIT,
             PARTICLES_HIT,
           );
-          if (!this.attackTarget.isActive) {
+          if (this.attackTarget.isDying) {
             this.scoreManager.recordKill(this.attackTarget.reward);
-            this.spawnParticles(
-              this.attackTarget.pos.x,
-              this.attackTarget.pos.y,
-              COLOR_KILL,
-              PARTICLES_KILL,
-            );
           }
           this.endAttack();
         } else {
@@ -459,6 +472,12 @@ export class Game {
     for (const gi of this.activeGoalIndices) {
       this.goalEggs[gi] = EGGS_PER_GOAL;
     }
+
+    // 破壊された珊瑚を全て復活させる
+    for (const coral of this.corals) {
+      coral.restore();
+    }
+
     if (!this.waveManager.isGameClear) {
       this.waveClearPhase = true;
     }
@@ -571,7 +590,7 @@ export class Game {
     let nearest: Enemy | null = null;
     let nearestDist = Infinity;
     for (const enemy of this.enemies) {
-      if (!enemy.isActive) continue;
+      if (!enemy.isActive || enemy.isDying) continue;
       const d = this.player.pos.distanceTo(enemy.pos);
       if (d < nearestDist) {
         nearestDist = d;
@@ -845,26 +864,18 @@ export class Game {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.fillRect(0, 0, r.width, 50);
 
-    this.drawHudEggIcon(ctx, 18, CY, 9);
-    r.drawText(
-      `×${this.playerHp}`,
-      new Vector2D(31, 30),
-      '#ffbb33',
-      'bold 15px monospace',
-    );
-
-    this.drawHudCrackedEggIcon(ctx, 67, CY, 9);
+    this.drawHudCrackedEggIcon(ctx, 18, CY, 9);
     r.drawText(
       `×${this.crackedEggs}`,
-      new Vector2D(80, 30),
+      new Vector2D(31, 30),
       '#c8e88a',
       'bold 15px monospace',
     );
 
-    this.drawMiniShark(ctx, 120, CY, 'small', 6);
+    this.drawMiniShark(ctx, 67, CY, 'small', 6);
     r.drawText(
       `${this.waveManager.currentWave}/${this.waveManager.totalWaves}`,
-      new Vector2D(133, 30),
+      new Vector2D(80, 30),
       '#7ec8e3',
       'bold 15px monospace',
     );

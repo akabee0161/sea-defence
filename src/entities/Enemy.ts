@@ -154,9 +154,12 @@ export class Enemy extends GameObject {
     ctx.fill();
 
     // Body (ellipse — wider than tall, front = right)
+    const sharkGrad = ctx.createLinearGradient(0, -r * 0.72, 0, r * 0.72);
+    sharkGrad.addColorStop(0, this.bodyColor);
+    sharkGrad.addColorStop(1, this.finColor);
     ctx.beginPath();
     ctx.ellipse(0, 0, r * 1.3, r * 0.72, 0, 0, Math.PI * 2);
-    ctx.fillStyle = this.bodyColor;
+    ctx.fillStyle = sharkGrad;
     ctx.fill();
     ctx.strokeStyle = this.finColor;
     ctx.lineWidth = r > 20 ? 3 : 2;

@@ -211,8 +211,8 @@ export class OctopusTower extends Tower {
     }
     ctx.restore();
 
-    // 胴体（円 + ラジアルグラデーション）
-    const grad = ctx.createRadialGradient(cx - 3, bcy - 4, 2, cx, bcy, bodyR * 1.2);
+    // 胴体（円 + 線形グラデーション）
+    const grad = ctx.createLinearGradient(cx, bcy - bodyR, cx, bcy + bodyR);
     grad.addColorStop(0,   '#f9d0c5');
     grad.addColorStop(0.5, '#e07060');
     grad.addColorStop(1,   '#b84040');
@@ -224,14 +224,6 @@ export class OctopusTower extends Tower {
     ctx.strokeStyle = '#9b3030';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-
-    // 光沢（左上の反射）
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(cx - 4, bcy - 5, 4, 3, -0.5, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
-    ctx.fill();
-    ctx.restore();
 
     // 目（白い強膜 → 暗い瞳孔 → ハイライト）
     for (const [ox, oy] of [[-5, -1.5], [5, -1.5]] as [number, number][]) {

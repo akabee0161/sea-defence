@@ -191,7 +191,7 @@ export class Game {
       this.eggPlacingPhase = true;
       return;
     }
-    this.scoreManager.startWave();
+
     this.waveManager.startWave();
   }
 
@@ -303,7 +303,12 @@ export class Game {
             PARTICLES_HIT,
           );
           if (enemy.isDying) {
-            this.scoreManager.recordKill(enemy.reward);
+            this.spawnParticles(
+              enemy.pos.x,
+              enemy.pos.y,
+              COLOR_KILL,
+              PARTICLES_KILL,
+            );
           }
           this.bulletPool.release(bullet);
           break;
@@ -388,7 +393,12 @@ export class Game {
             PARTICLES_HIT,
           );
           if (this.attackTarget.isDying) {
-            this.scoreManager.recordKill(this.attackTarget.reward);
+            this.spawnParticles(
+              this.attackTarget.pos.x,
+              this.attackTarget.pos.y,
+              COLOR_KILL,
+              PARTICLES_KILL,
+            );
           }
           this.endAttack();
         } else {
@@ -1063,9 +1073,8 @@ export class Game {
 
       ctx.font = '15px monospace';
       ctx.fillStyle = '#c8e88a';
-      ctx.fillText(`Enemies:    +${d.enemyScore}`, cx, cy + 6);
-      ctx.fillText(`Eggs:       +${d.eggScore}`, cx, cy + 26);
-      ctx.fillText(`Time bonus: +${d.timeBonus}`, cx, cy + 46);
+      ctx.fillText(`Eggs:       +${d.eggScore}`, cx, cy + 6);
+      ctx.fillText(`Time bonus: +${d.timeBonus}`, cx, cy + 26);
 
       ctx.font = '13px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
@@ -1114,13 +1123,12 @@ export class Game {
 
       ctx.font = '16px monospace';
       ctx.fillStyle = '#c8e88a';
-      ctx.fillText(`Enemies:     +${d.enemyScore}`, cx, cy + 40);
-      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 62);
-      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 84);
+      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 40);
+      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 62);
 
       ctx.font = '14px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('──────────────────────', cx, cy + 100);
+      ctx.fillText('──────────────────────', cx, cy + 78);
     }
 
     ctx.font = 'bold 20px monospace';
@@ -1321,13 +1329,12 @@ export class Game {
 
       ctx.font = '16px monospace';
       ctx.fillStyle = '#c8e88a';
-      ctx.fillText(`Enemies:     +${d.enemyScore}`, cx, cy + 40);
-      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 62);
-      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 84);
+      ctx.fillText(`Eggs:        +${d.eggScore}`, cx, cy + 40);
+      ctx.fillText(`Time bonus:  +${d.timeBonus}`, cx, cy + 62);
 
       ctx.font = '14px monospace';
       ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('──────────────────────', cx, cy + 100);
+      ctx.fillText('──────────────────────', cx, cy + 78);
     }
 
     ctx.font = 'bold 18px monospace';

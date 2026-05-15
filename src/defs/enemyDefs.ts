@@ -3,7 +3,7 @@ export interface EnemyDef {
   radius: number;
   speed: number;
   maxHp: number;
-  reward: number;
+
   bodyColor: string;
   finColor: string;
 }
@@ -18,7 +18,7 @@ export const ENEMY_DEFS = {
     radius: 11,
     speed: 180,
     maxHp: 80,
-    reward: 1,
+
     bodyColor: '#5dade2',
     finColor: '#2471a3',
   },
@@ -27,7 +27,7 @@ export const ENEMY_DEFS = {
     radius: 17,
     speed: 120,
     maxHp: 320,
-    reward: 4,
+
     bodyColor: '#f4d03f',
     finColor: '#b7950b',
   },
@@ -36,7 +36,7 @@ export const ENEMY_DEFS = {
     radius: 30,
     speed: 80,
     maxHp: 1200,
-    reward: 15,
+
     bodyColor: '#e74c3c',
     finColor: '#922b21',
   },

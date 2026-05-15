@@ -14,7 +14,6 @@ const DYING_DURATION = 0.7; // seconds for death fade animation
 export class Enemy extends GameObject {
   readonly kind: EnemyKind;
   readonly radius: number;
-  readonly reward: number;
 
   private waypoints: Vector2D[];
   private waypointIndex: number;
@@ -44,7 +43,7 @@ export class Enemy extends GameObject {
     this.speed = def.speed;
     this.maxHp = def.maxHp;
     this.hp = def.maxHp;
-    this.reward = def.reward;
+
     this.bodyColor = def.bodyColor;
     this.finColor = def.finColor;
     this.currentGoalIdx = goalIdx;

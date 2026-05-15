@@ -846,12 +846,15 @@ export class EelTower extends Tower {
 
     if (state === 'idle') {
       ctx.save();
+      const eelBodyGrad = ctx.createLinearGradient(cx, cy - 18, cx, cy + 10);
+      eelBodyGrad.addColorStop(0, '#a07c0a');
+      eelBodyGrad.addColorStop(1, '#5a4204');
       // Body: thick dark-brown S-curve (same width as head)
       ctx.beginPath();
       ctx.moveTo(cx, cy + 10);
       ctx.bezierCurveTo(cx + 13, cy + 4, cx - 13, cy, cx, cy - 5);
       ctx.bezierCurveTo(cx + 13, cy - 10, cx + 8, cy - 18, cx, cy - 18);
-      ctx.strokeStyle = '#8a6a08';
+      ctx.strokeStyle = eelBodyGrad;
       ctx.lineWidth = 13;
       ctx.lineCap = 'round';
       ctx.stroke();
@@ -949,10 +952,13 @@ export class EelTower extends Tower {
     const midX = cx + (head.x - cx) * 0.5 + perp.x * 12 * visualProgress;
     const midY = cy + (head.y - cy) * 0.5 + perp.y * 12 * visualProgress;
 
+    const eelStretchGrad = ctx.createLinearGradient(cx, cy, head.x, head.y);
+    eelStretchGrad.addColorStop(0, '#a07c0a');
+    eelStretchGrad.addColorStop(1, '#5a4204');
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.quadraticCurveTo(midX, midY, head.x, head.y);
-    ctx.strokeStyle = state === 'anticipating' ? '#a07c0a' : '#8a6a08';
+    ctx.strokeStyle = state === 'anticipating' ? '#a07c0a' : eelStretchGrad;
     ctx.lineWidth = 13;
     ctx.lineCap = 'round';
     ctx.stroke();

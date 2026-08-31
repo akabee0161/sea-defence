@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/labs/games/sea-defence/',
+  base: '/play/sea-defence/',
   build: {
-    outDir: 'out',
+    outDir: 'out/play/sea-defence',
+    emptyOutDir: true,
   },
 });

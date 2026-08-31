@@ -2,6 +2,7 @@
   "name": "sea-defence",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=22" },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
@@ -12,6 +13,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.4.15",
     "typescript": "^5.4.5",
-    "vite": "^5.2.11"
+    "vite": "^5.2.11",
+    "wrangler": "^4.0.0"
   }
 }

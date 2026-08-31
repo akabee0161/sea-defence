@@ -3,3 +3,4 @@ dist/
 out/
 docs/superpowers/
 .claude/settings.local.json
+.wrangler/

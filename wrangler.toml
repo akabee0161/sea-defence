@@ -1,0 +1,10 @@
+name = "ankardo-game-sea-defence"
+compatibility_date = "2026-08-31"
+
+routes = [
+  { pattern = "ankardo.com/play/sea-defence/*", zone_name = "ankardo.com" }
+]
+
+[assets]
+directory = "./out"
+not_found_handling = "404-page"

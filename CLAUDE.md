@@ -5,7 +5,7 @@
 | 項目 | 内容 |
 |---|---|
 | 言語 | TypeScript (strict, isolatedModules: true) |
-| バンドラー | Vite 5（成果物は `out/` へ出力） |
+| バンドラー | Vite 5（成果物は `out/play/sea-defence/` へ出力） |
 | 描画 | HTML5 Canvas API (400×700px) |
 | 外部ゲームライブラリ | なし（フルスクラッチ） |
 
@@ -26,7 +26,7 @@
 
 ```bash
 npm run dev      # 開発サーバー → http://localhost:5173
-npm run build    # 本番ビルド（out/ へ出力）
+npm run build    # 本番ビルド（out/play/sea-defence/ へ出力）
 npm run preview  # 本番ビルドのプレビュー
 npm run lint     # Biome lint チェック（src/ 対象）
 npm run format   # Biome フォーマット自動修正（src/ 対象）
@@ -40,7 +40,7 @@ npm run format   # Biome フォーマット自動修正（src/ 対象）
 - `TileType` は `enum`（`const enum` 不可、isolatedModules: true のため）。
 - ピクセル座標はタイル座標に `GRID_OFFSET_Y` を加算すること（Tower・CoralWall 参照）。
 - `noUnusedLocals` / `noUnusedParameters` が有効。未使用の変数・引数はビルドエラーになる。
-- **デプロイパス**：Vite `base` は `/labs/games/sea-defence/` 固定。静的アセット参照時に注意。
+- **デプロイパス**：Vite `base` は `/play/sea-defence/` 固定(ankardo.com上でCloudflare Workersがこのパスにルーティング)。静的アセット参照時に注意。
 - ゲームループは固定タイムステップ（`FIXED_TIMESTEP = 1000/60`）。`update()` は常に `dt = 1/60` で呼ばれる。
 - 経路・スポーン・ゴール列・設置スポットはすべて `mapDefs.ts` の `MAP_DEF` のみで管理。新規追加時はここだけ編集すれば足りる。
 - `Tower.ts`（1171行）と `Game.ts`（1362行）は意図的に大きい。グローバルの800行制限の例外として扱う。

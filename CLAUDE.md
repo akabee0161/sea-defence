@@ -45,3 +45,11 @@ npm run format   # Biome フォーマット自動修正（src/ 対象）
 - 経路・スポーン・ゴール列・設置スポットはすべて `mapDefs.ts` の `MAP_DEF` のみで管理。新規追加時はここだけ編集すれば足りる。
 - `Tower.ts`（1171行）と `Game.ts`（1362行）は意図的に大きい。グローバルの800行制限の例外として扱う。
 - テストフレームワーク未導入。グローバルの TDD/80%カバレッジルールは本プロジェクトでは適用外。
+
+## ブランチとプレビュー
+
+- 機能ブランチから `develop` への PR を最初に作る。`develop` にマージすると、Cloudflare Access の受付の後ろに確認用のプレビューが固定の URL に自動で上がる（`.github/workflows/preview.yml`）
+- 本番に出すときは、`develop` から `main` への PR をマージする（`deploy.yml` が本番に出す）
+- `preview.yml` は `develop` への push だけで動き、`wrangler deploy` は書かない。`wrangler.toml` の `preview_urls = true` は確認用プレビューのためで、本番の `workers.dev` は開かない
+- このリポジトリにはテストがないため、`preview.yml` は共通のひな形の `npm test` を `npm run lint` に置き換えている（`deploy.yml` と同じ手順）
+- `develop` ができるまでの最初の PR（プレビューの導入そのもの）だけは `main` に向ける
